@@ -49,6 +49,7 @@ testCreateOpenClose(void)
   ASSERT_TRUE((fh.curPagePos == 0), "freshly opened file's page position should be 0");
 
   TEST_CHECK(closePageFile (&fh));
+
   TEST_CHECK(destroyPageFile (TESTPF));
 
   // after destruction trying to open the file should cause an error
