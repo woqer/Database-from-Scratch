@@ -1,3 +1,5 @@
+#include <sys/stat.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -95,8 +97,15 @@ testSinglePageContent(void)
     ASSERT_TRUE((ph[i] == (i % 10) + '0'), "character in page read from disk is the one we expected.");
   printf("reading first block\n");
 
-  // Need some test on appendEmptyBlock
-  // TEST_CHECK(appendEmptyBlock(&fh));
+    // Additional Tests for appendEmptyBlock and ensureCapacity
+    struct stat fileStat;
+    TEST_CHECK(appendEmptyBlock(&fh));
+    stat(fh.fileName,&fileStat);
+    ASSERT_TRUE((fileStat.st_size == 20480), "size after append is what we expected.");
+    
+    TEST_CHECK(ensureCapacity(5, &fh));
+    stat(fh.fileName,&fileStat);
+    ASSERT_TRUE((fileStat.st_size == 53248), "size after ensure capacity 5 is what we expected.");
 
   // destroy new page file
   TEST_CHECK(destroyPageFile (TESTPF));  
