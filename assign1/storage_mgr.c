@@ -211,23 +211,18 @@ writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 
 	buff = (char*)malloc(sizeof(char)*PAGE_SIZE);
 
-	if ( (totalNumPages = readHeader(fp)) < 1) return RC_FILE_R_W_ERROR;
+	if ((totalNumPages = readHeader(fp)) < 1) return RC_FILE_R_W_ERROR;
 
-	if ((pageNum > totalNumPages) || (pageNum < 0)) return RC_READ_NON_EXISTING_PAGE;
-
-	if (writeHeader(fp,totalNumPages) < 1) return RC_FILE_R_W_ERROR;
+	if ((pageNum >= totalNumPages) || (pageNum < 0)) return RC_READ_NON_EXISTING_PAGE;
 
 	int i;
 	for (i = 0; i < pageNum; i++) {
 		fread(buff, sizeof(char)*PAGE_SIZE, 1, fp);
-		totalNumPages++;
 	}
 
 	if (fwrite(memPage, sizeof(char)*PAGE_SIZE, 1, fp) < 1) return RC_WRITE_FAILED;
 
-	fHandle->totalNumPages = totalNumPages;
 	fHandle->curPagePos = pageNum + 1;
-
 
 	free(buff);
 	fclose(fp);
