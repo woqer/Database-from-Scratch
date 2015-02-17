@@ -9,6 +9,8 @@
 /* return code definitions */
 typedef int RC;
 
+#define RC_FILE_R_W_ERROR -1
+
 #define RC_OK 0
 #define RC_FILE_NOT_FOUND 1
 #define RC_FILE_HANDLE_NOT_INIT 2

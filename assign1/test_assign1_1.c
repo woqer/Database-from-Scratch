@@ -101,11 +101,11 @@ testSinglePageContent(void)
     struct stat fileStat;
     TEST_CHECK(appendEmptyBlock(&fh));
     stat(fh.fileName,&fileStat);
-    ASSERT_TRUE((fileStat.st_size == 20480), "size after append is what we expected.");
+    ASSERT_TRUE((fileStat.st_size == 12288), "size after append is what we expected.");
     
     TEST_CHECK(ensureCapacity(5, &fh));
     stat(fh.fileName,&fileStat);
-    ASSERT_TRUE((fileStat.st_size == 53248), "size after ensure capacity 5 is what we expected.");
+    ASSERT_TRUE((fileStat.st_size == 24576), "size after ensure capacity 5 is what we expected.");
 
   // destroy new page file
   TEST_CHECK(destroyPageFile (TESTPF));  

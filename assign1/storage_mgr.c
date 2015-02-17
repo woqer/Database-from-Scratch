@@ -33,15 +33,24 @@ writeHeader (FILE *fp, int totalNumPages)
 {
 	int size_header;
 	char *header;
+	char zero = '\0';
 
 	header = (char*)malloc(sizeof(char)*HEADER_SIZE);
 
 	sprintf(header, "%04d", totalNumPages);
 
-	size_header = fwrite(header, sizeof(char)*HEADER_SIZE, 1, fp);
-	size_header = fwrite("\0", sizeof(char), PAGE_SIZE - HEADER_SIZE, fp);
+	fseek(fp, 0L, SEEK_SET);
+	if ((size_header = fwrite(header, sizeof(char)*HEADER_SIZE, 1, fp)) < 1) {
+		// printf("\nWRITEHEADER(header): size_header %d\n", size_header);
+		return RC_FILE_R_W_ERROR;
+	}
+	if ((size_header = fwrite(&zero, sizeof(char), PAGE_SIZE - HEADER_SIZE, fp)) < 1) {
+		// printf("\nWRITEHEADER(zeros): size_header %d\n", size_header);
+		return RC_FILE_R_W_ERROR;
+	}
 
 	free(header);
+	// printf("\nWRITEHEADER(return): size_header %d\n", size_header);
 
 	return size_header;
 }
@@ -57,17 +66,23 @@ createPageFile (char *fileName)
 {
 	FILE *fp;
 	size_t size_wrote;
+	int size_header;
+	char zero = '\0';
 
-	if ((fp = fopen(fileName, "w")) == NULL) return RC_WRITE_FAILED;
+	if ((fp = fopen(fileName, "w")) == NULL) return RC_FILE_R_W_ERROR;
 	
 	// First we write the initial file handler information (1 page count)
-	if (writeHeader(fp, 1) < 1) return RC_WRITE_FAILED;
+	if ((size_header = writeHeader(fp, 1)) < 1) {
+		// printf("CREATEPAGEFILE(writeHeader): size_header %d\n", size_header);
+		return RC_FILE_R_W_ERROR;
+	}
 
 	// We fill in with '\0' a single page
-	size_wrote = fwrite("\0", sizeof(char), PAGE_SIZE, fp);
+	size_wrote = fwrite(&zero, sizeof(char), PAGE_SIZE, fp);
+	// printf("CREATEPAGEFILE(fwrite): size_wrote %d\n", size_wrote);
 
 	if (size_wrote != PAGE_SIZE) {
-		return RC_WRITE_FAILED;
+		return RC_FILE_R_W_ERROR;
 	} else {
 		fclose(fp);
 		return RC_OK;
@@ -85,11 +100,13 @@ openPageFile (char *fileName, SM_FileHandle *fHandle)
 	
 	fp = fopen(fileName, "r");
 
-	if ((totalNumPages = readHeader(fp)) < 1) return -1;
+	if ((totalNumPages = readHeader(fp)) < 1) return RC_FILE_R_W_ERROR;
 
 	fHandle->fileName = fileName;
 	fHandle->totalNumPages = totalNumPages;
 	fHandle->curPagePos = 0;
+
+	fclose(fp);
 
 	return RC_OK;
 }
@@ -106,7 +123,7 @@ destroyPageFile (char *fileName)
 {
 	if (access(fileName, R_OK) < 0) return RC_FILE_NOT_FOUND;
 	if (remove(fileName) < 0) {
-		return RC_WRITE_FAILED;
+		return RC_FILE_R_W_ERROR;
 	} else {
 		return RC_OK;
 	}
@@ -127,7 +144,7 @@ readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 
 	buff = (char*)malloc(sizeof(char)*PAGE_SIZE);
 
-	if ( (totalNumPages = readHeader(fp)) < 1) return -1;
+	if ( (totalNumPages = readHeader(fp)) < 1) return RC_FILE_R_W_ERROR;
 
 	if ((pageNum > totalNumPages) || (pageNum < 0)) return RC_READ_NON_EXISTING_PAGE;
 
@@ -139,6 +156,7 @@ readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 	strncpy(memPage, buff, PAGE_SIZE);
 
 	free(buff);
+	fclose(fp);
 
 	return RC_OK;
 }
@@ -193,18 +211,26 @@ writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 
 	buff = (char*)malloc(sizeof(char)*PAGE_SIZE);
 
-	if ( (totalNumPages = readHeader(fp)) < 1) return -1;
+	if ( (totalNumPages = readHeader(fp)) < 1) return RC_FILE_R_W_ERROR;
 
 	if ((pageNum > totalNumPages) || (pageNum < 0)) return RC_READ_NON_EXISTING_PAGE;
 
+	if (writeHeader(fp,totalNumPages) < 1) return RC_FILE_R_W_ERROR;
+
 	int i;
-	for (i = 0; i < pageNum-1; i++) {
+	for (i = 0; i < pageNum; i++) {
 		fread(buff, sizeof(char)*PAGE_SIZE, 1, fp);
+		totalNumPages++;
 	}
 
-	fwrite(memPage, sizeof(char)*PAGE_SIZE, 1, fp);
+	if (fwrite(memPage, sizeof(char)*PAGE_SIZE, 1, fp) < 1) return RC_WRITE_FAILED;
+
+	fHandle->totalNumPages = totalNumPages;
+	fHandle->curPagePos = pageNum + 1;
+
 
 	free(buff);
+	fclose(fp);
 
 	return RC_OK;
 }
@@ -223,6 +249,7 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 	FILE *fp;
 	int totalNumPages, i, h_size;
 	char *buff;
+	char zero = '\0';
 
 	if (access(fHandle->fileName, R_OK) < 0) return RC_FILE_NOT_FOUND;
 
@@ -230,32 +257,41 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 
 	buff = (char*)malloc(sizeof(char)*PAGE_SIZE);
 
-	if ((totalNumPages = readHeader(fp)) < 1) return -1;
+	if ((totalNumPages = readHeader(fp)) < 1) return RC_FILE_R_W_ERROR;
 
-	fseek(fp, 0, SEEK_SET);
+	rewind(fp);
 
-	writeHeader(fp,totalNumPages+1);
+	if (writeHeader(fp,totalNumPages+1) < 1) return RC_FILE_R_W_ERROR;
 
-	fseek(fp, ftell(fp), SEEK_CUR);
+	printf("\n");
+	printf("APPEND: ftell_pre-fseek %ld\n", ftell(fp));
+	fseek(fp, 0L, SEEK_CUR);
+	printf("APPEND: ftell_post-fseek %ld\n", ftell(fp));
+
 	for (i = 0; i < totalNumPages; i++) {
 		fread(buff, sizeof(char)*PAGE_SIZE, 1, fp);
+		printf("APPEND: totalNumPages_header %d\n", totalNumPages);
+		printf("APPEND: iteration %d\n", i);
 	}
-	fseek(fp, ftell(fp), SEEK_CUR);
-	fwrite("\0", sizeof(char)*PAGE_SIZE, 1, fp);
-    
-    // log file info to console
-    struct stat fileStat;
-    if(stat(fHandle->fileName,&fileStat) < 0)
-        return -1;
-    printf("\n\n**APPEND LOG**\n");
-    printf("************************************\n");
-    printf("File Name: \t\t%s\n",fHandle->fileName);
-    printf("File Size: \t\t%lld bytes\n",fileStat.st_size);
-    printf("Total # Pages: \t%d\n",totalNumPages);
-    
+	fseek(fp, 0L, SEEK_CUR);
+	fwrite(&zero, sizeof(char), PAGE_SIZE, fp);
+
+	fHandle->totalNumPages++;
+	fHandle->curPagePos++;
 
 	free(buff);
+	fclose(fp);
 
+	// log file info to console
+  struct stat fileStat;
+  if(stat(fHandle->fileName,&fileStat) < 0)
+      return RC_FILE_R_W_ERROR;
+  printf("\n\n**APPEND LOG**\n");
+  printf("************************************\n");
+  printf("File Name: \t\t%s\n",fHandle->fileName);
+  printf("File Size: \t\t%lld bytes\n",fileStat.st_size);
+  printf("Total # Pages: \t%d\n",fHandle->totalNumPages);
+  
 	return RC_OK;
 }
 
@@ -273,7 +309,7 @@ ensureCapacity (int numberOfPages, SM_FileHandle *fHandle)
     
     buff = (char*)malloc(sizeof(char)*PAGE_SIZE);
     
-    if ((totalNumPages = readHeader(fp)) < 1) return -1;
+    if ((totalNumPages = readHeader(fp)) < 1) return RC_FILE_R_W_ERROR;
     
     if (numberOfPages > totalNumPages) {
         for (i = 0; i < (numberOfPages - totalNumPages); i++) {
@@ -284,12 +320,15 @@ ensureCapacity (int numberOfPages, SM_FileHandle *fHandle)
     // log file info to console
     struct stat fileStat;
     if(stat(fHandle->fileName,&fileStat) < 0)
-        return -1;
+        return RC_FILE_R_W_ERROR;
     printf("\n\n**ENSURE LOG**\n");
     printf("************************************\n");
     printf("File Name: \t\t%s\n",fHandle->fileName);
     printf("File Size: \t\t%lld bytes\n",fileStat.st_size);
-    printf("Total # Pages: \t%d\n",totalNumPages);
+    printf("Total # Pages: \t%d\n",fHandle->totalNumPages);
     
+    free(buff);
+    fclose(fp);
+
     return RC_OK;
 }
