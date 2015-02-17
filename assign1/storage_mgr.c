@@ -1,3 +1,5 @@
+#include <sys/stat.h>
+
 #include "storage_mgr.h"
 #include "stdlib.h"
 #include "unistd.h"
@@ -40,8 +42,6 @@ writeHeader (FILE *fp, int totalNumPages)
 	size_header = fwrite("\0", sizeof(char), PAGE_SIZE - HEADER_SIZE, fp);
 
 	free(header);
-
-	printf("%d\n", size_header);
 
 	return size_header;
 }
@@ -242,6 +242,17 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 	}
 	fseek(fp, ftell(fp), SEEK_CUR);
 	fwrite("\0", sizeof(char)*PAGE_SIZE, 1, fp);
+    
+    // log file info to console
+    struct stat fileStat;
+    if(stat(fHandle->fileName,&fileStat) < 0)
+        return -1;
+    printf("\n\n**APPEND LOG**\n");
+    printf("************************************\n");
+    printf("File Name: \t\t%s\n",fHandle->fileName);
+    printf("File Size: \t\t%lld bytes\n",fileStat.st_size);
+    printf("Total # Pages: \t%d\n",totalNumPages);
+    
 
 	free(buff);
 
@@ -251,5 +262,34 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 RC
 ensureCapacity (int numberOfPages, SM_FileHandle *fHandle)
 {
-	return RC_OK;
+    
+    FILE *fp;
+    int totalNumPages, i;
+    char *buff;
+    
+    if (access(fHandle->fileName, R_OK) < 0) return RC_FILE_NOT_FOUND;
+    
+    fp = fopen(fHandle->fileName, "r+");
+    
+    buff = (char*)malloc(sizeof(char)*PAGE_SIZE);
+    
+    if ((totalNumPages = readHeader(fp)) < 1) return -1;
+    
+    if (numberOfPages > totalNumPages) {
+        for (i = 0; i < (numberOfPages - totalNumPages); i++) {
+            appendEmptyBlock(fHandle);
+        }
+    }
+    
+    // log file info to console
+    struct stat fileStat;
+    if(stat(fHandle->fileName,&fileStat) < 0)
+        return -1;
+    printf("\n\n**ENSURE LOG**\n");
+    printf("************************************\n");
+    printf("File Name: \t\t%s\n",fHandle->fileName);
+    printf("File Size: \t\t%lld bytes\n",fileStat.st_size);
+    printf("Total # Pages: \t%d\n",totalNumPages);
+    
+    return RC_OK;
 }
