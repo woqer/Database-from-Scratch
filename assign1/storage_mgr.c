@@ -274,7 +274,7 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 	fwrite(&zero, sizeof(char), PAGE_SIZE, fp);
 
 	fHandle->totalNumPages++;
-	fHandle->curPagePos++;
+	fHandle->curPagePos;
 
 	free(buff);
 	fclose(fp);
