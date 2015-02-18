@@ -178,6 +178,8 @@ readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 
 	strncpy(memPage, buff, PAGE_SIZE);
 
+	fHandle->curPagePos = pageNum;
+
 	free(buff);
 	fclose(fp);
 
@@ -266,7 +268,7 @@ writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 	//write memPage to the pageNum
 	if (fwrite(memPage, sizeof(char)*PAGE_SIZE, 1, fp) < 1) return RC_WRITE_FAILED;
 
-	fHandle->curPagePos = pageNum + 1;
+	fHandle->curPagePos = pageNum;
 
 	free(buff);
 	fclose(fp);
@@ -320,7 +322,7 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 	fwrite(&zero, sizeof(char), PAGE_SIZE, fp);
 
 	fHandle->totalNumPages++;
-	fHandle->curPagePos++;
+	fHandle->curPagePos;
 
 	free(buff);
 	fclose(fp);
