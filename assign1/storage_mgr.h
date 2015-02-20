@@ -18,6 +18,10 @@ typedef char* SM_PageHandle;
 /************************************************************
  *                    interface                             *
  ************************************************************/
+/* header helpers */
+extern int readHeader (FILE *fp);
+extern int writeHeader (FILE *fp, int totalNumPages);
+
 /* manipulating page files */
 extern void initStorageManager (void);
 extern RC createPageFile (char *fileName);
