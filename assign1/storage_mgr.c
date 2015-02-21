@@ -235,7 +235,7 @@ readNextBlock (SM_FileHandle *fHandle, SM_PageHandle memPage)
 RC
 readLastBlock (SM_FileHandle *fHandle, SM_PageHandle memPage)
 {
-	return readBlock(fHandle->totalNumPages,fHandle,memPage);;
+	return readBlock(fHandle->totalNumPages-1,fHandle,memPage);;
 }
 
 /* Write what is in the memPage to the pageNumth block.
