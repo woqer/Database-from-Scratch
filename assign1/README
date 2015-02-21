@@ -1,0 +1,41 @@
+
+* Wilfrido Vidana
+* Matthew Jankowiak
+* Zhiqun Nie
+* An Shi
+
+Description:
+The program is trying to implement a storage manager that is able to read blocks from a file on disk and write blocks from memory to a file on disk.
+
+Files included:
+	assign1
+		README.txt
+                dberror.c
+                dberror.h
+                storage_mgr.c
+                storage_mgr.h
+                test_assign1_1.c
+		t_assign1_1
+                test_helper.h
+		Makefile
+
+Methods implemented in storage_mgr.c:
+* Create a header page which has the header size of 4, to save the information of the pageFile, the readHeader() method returns the total number of pages, writeHeader()method tries to write the header info and filled the rest of the page with 0's and the method returns the message whether write is successful or not,but when counting total number of pages and current page position, the header page is not included.
+* Create a page file and fills the single page with '0\' bytes, then implements openPageFile,closePageFile and destroyPageFile.
+* Implement readBlock(), readPreviousBlock(), readCurrentBlock(),readNextBlock() and writeBlock(), writeCurrentBlock() methods.
+* Implement appendEmptyBlock() method which increases the number of pages by one and filled with '\0' bytes. Test case is added to test this method.
+
+Additional test case added in test_assign1_1.c for the following methods:
+* readPreviousBlock()
+* readNextBlock()
+* readCurrentBlock()
+* writeCurrentBlock()
+* appendEmptyBlock()
+	logs attached for each iteration that record the the total number of page and size of the file.
+* ensureCapacity()
+	logs attached to show the total number of pages.
+
+Excution instructions:
+* excutable file generated for test_assign1_1.c
+* excute t_assign1_1
+* all test cases pass with logs attached
