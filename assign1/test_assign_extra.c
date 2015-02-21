@@ -70,12 +70,13 @@ void
 testSinglePageContent(void)
 {
   SM_FileHandle fh;
-  SM_PageHandle ph;
+  SM_PageHandle ph, ph_zero;
   int i;
 
   testName = "test single page content";
 
   ph = (SM_PageHandle) malloc(PAGE_SIZE);
+  ph_zero = (SM_PageHandle) malloc(PAGE_SIZE);
 
   // create a new page file
   TEST_CHECK(createPageFile (TESTPF));
@@ -126,13 +127,49 @@ testSinglePageContent(void)
   TEST_CHECK(appendEmptyBlock(&fh));
   stat(fh.fileName,&fileStat);
   ASSERT_TRUE((fileStat.st_size == 12288), "size after append is what we expected.");
-  
+
+
+	// testing reading and writing with new pages created with appendEmptyblock
+   TEST_CHECK(readBlock (1,&fh, ph_zero));
+  // the page should be empty (zero bytes)
+  for (i=0; i < PAGE_SIZE; i++) {
+    ASSERT_TRUE((ph_zero[i] == 0), "expected zero byte in first page of freshly initialized page");
+  }
+  fh.curPagePos = 2;
+  ASSERT_ERROR(writeCurrentBlock(&fh,ph), "should error RC_READ_NON_EXISTING_PAGE");
+  TEST_CHECK(writeBlock (0, &fh, ph_zero));
+  fh.curPagePos = 1;
+  TEST_CHECK(writeCurrentBlock(&fh,ph));
+  // new block should have ph = i % 10
+	TEST_CHECK(readBlock(1, &fh, ph));
+	for (i=0; i < PAGE_SIZE; i++) {
+		// printf("ph[0] after:\t%c\n", ph[i]);
+    ASSERT_TRUE((ph[i] == (i % 10) + '0'), "readBlock(0) results the same as readFirstBlock");
+  }
+
+
   TEST_CHECK(ensureCapacity(5, &fh));
   stat(fh.fileName,&fileStat);
   ASSERT_TRUE((fileStat.st_size == 24576), "size after ensure capacity 5 is what we expected.");
 
+  // testing reading and writing with new pages created with ensureCapacity
+  TEST_CHECK(readBlock (3,&fh, ph_zero));
+  // the page should be empty (zero bytes)
+  for (i=0; i < PAGE_SIZE; i++) {
+    ASSERT_TRUE((ph_zero[i] == 0), "expected zero byte in first page of freshly initialized page");
+  }
+  TEST_CHECK(writeBlock (3, &fh, ph));
+	// new block should have ph = i % 10
+	TEST_CHECK(readBlock(3, &fh, ph));
+	for (i=0; i < PAGE_SIZE; i++) {
+		// printf("ph[0] after:\t%c\n", ph[i]);
+    ASSERT_TRUE((ph[i] == (i % 10) + '0'), "readBlock(0) results the same as readFirstBlock");
+  }
+  
   // destroy new page file
   TEST_CHECK(destroyPageFile (TESTPF));  
+
+
 
   TEST_DONE();
 }
