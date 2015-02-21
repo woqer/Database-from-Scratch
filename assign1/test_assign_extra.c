@@ -105,13 +105,14 @@ testSinglePageContent(void)
 
   // printf("ph[0] before:\t%c\n", ph[0]);
 	TEST_CHECK(readBlock(0, &fh, ph));
-	for (i=0; i < 20; i++) {
+	for (i=0; i < PAGE_SIZE; i++) {
 		// printf("ph[0] after:\t%c\n", ph[i]);
     ASSERT_TRUE((ph[i] == (i % 10) + '0'), "readBlock(0) results the same as readFirstBlock");
   }
   
   // trying to read block 1 should return RC_FILE_NOT_FOUND
-  ASSERT_EQUALS_INT(readBlock(1, &fh, ph), RC_FILE_NOT_FOUND, "trying to read block 1 should return RC_FILE_NOT_FOUND");
+  printf("readblock(1): %d\n", readBlock(1, &fh, ph));
+  ASSERT_ERROR(readBlock(1, &fh, ph), "trying to read block 1 should return RC_READ_NON_EXISTING_PAGE");
 
   fh.curPagePos = 1;
   ASSERT_EQUALS_INT(getBlockPos(&fh), 1 , "testing position returned by getblockPos");

@@ -160,7 +160,11 @@ readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 	int totalNumPages;
 	char *buff;
 
-	if (access(fHandle->fileName, R_OK) < 0) return RC_FILE_NOT_FOUND;
+	int rc_access;
+	if ((rc_access = access(fHandle->fileName, R_OK)) < 0) {
+		printf("rc_access: %d\n", rc_access);
+		return RC_FILE_NOT_FOUND;
+	} 
 
 	fp = fopen(fHandle->fileName, "r");
 
@@ -169,10 +173,10 @@ readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 	if ( (totalNumPages = readHeader(fp)) < 1) return RC_FILE_R_W_ERROR;
 
 	//check if pageNum is valid
-	if ((pageNum > totalNumPages) || (pageNum < 0)) return RC_READ_NON_EXISTING_PAGE;
+	if ((pageNum >= totalNumPages) || (pageNum < 0)) return RC_READ_NON_EXISTING_PAGE;
 
 	int i;
-	for (i = 0; i < pageNum; i++) {
+	for (i = 0; i < (pageNum +1); i++) {
 		fread(buff, sizeof(char)*PAGE_SIZE, 1, fp);
 	}
 
@@ -192,11 +196,11 @@ int getBlockPos (SM_FileHandle *fHandle)
 	return fHandle->curPagePos;
 }
 
-/* Read the first page in the file by calling readBlock() with pageNum = 1. */
+/* Read the first page in the file by calling readBlock() with pageNum = 0. */
 RC
 readFirstBlock (SM_FileHandle *fHandle, SM_PageHandle memPage)
 {
-	return readBlock(1,fHandle,memPage);
+	return readBlock(0,fHandle,memPage);
 }
 
 /* Read previous page relative to the curPagePos of the file, 
@@ -307,16 +311,18 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 
 	if (writeHeader(fp,totalNumPages+1) < 1) return RC_FILE_R_W_ERROR;
 
-	printf("\n");
-	printf("APPEND: ftell_pre-fseek %ld\n", ftell(fp));
+	// printf("\n");
+	// printf("APPEND: ftell_pre-fseek %ld\n", ftell(fp));
+	
 	fseek(fp, 0L, SEEK_CUR);
-	printf("APPEND: ftell_post-fseek %ld\n", ftell(fp));
+	
+	// printf("APPEND: ftell_post-fseek %ld\n", ftell(fp));
 
 	//read to the end of the page file
 	for (i = 0; i < totalNumPages; i++) {
 		fread(buff, sizeof(char)*PAGE_SIZE, 1, fp);
-		printf("APPEND: totalNumPages_header %d\n", totalNumPages);
-		printf("APPEND: iteration %d\n", i);
+		// printf("APPEND: totalNumPages_header %d\n", totalNumPages);
+		// printf("APPEND: iteration %d\n", i);
 	}
 	fseek(fp, 0L, SEEK_CUR);
 	fwrite(&zero, sizeof(char), PAGE_SIZE, fp);
@@ -328,14 +334,14 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 	fclose(fp);
 
 	// log file info to console
-    struct stat fileStat;
-    if(stat(fHandle->fileName,&fileStat) < 0)
-	    return RC_FILE_R_W_ERROR;
-	printf("\n\n**APPEND LOG**\n");
-	printf("************************************\n");
-	printf("File Name: \t\t%s\n",fHandle->fileName);
-	printf("File Size: \t\t%lld bytes\n",fileStat.st_size);
-	printf("Total # Pages: \t%d\n",fHandle->totalNumPages);
+  struct stat fileStat;
+  if(stat(fHandle->fileName,&fileStat) < 0)
+    return RC_FILE_R_W_ERROR;
+	// printf("\n\n**APPEND LOG**\n");
+	// printf("************************************\n");
+	// printf("File Name: \t\t%s\n",fHandle->fileName);
+	// printf("File Size: \t\t%lld bytes\n",fileStat.st_size);
+	// printf("Total # Pages: \t%d\n",fHandle->totalNumPages);
   
 	return RC_OK;
 }
@@ -370,11 +376,11 @@ ensureCapacity (int numberOfPages, SM_FileHandle *fHandle)
     struct stat fileStat;
     if(stat(fHandle->fileName,&fileStat) < 0)
         return RC_FILE_R_W_ERROR;
-    printf("\n\n**ENSURE LOG**\n");
-    printf("************************************\n");
-    printf("File Name: \t\t%s\n",fHandle->fileName);
-    printf("File Size: \t\t%lld bytes\n",fileStat.st_size);
-    printf("Total # Pages: \t%d\n",fHandle->totalNumPages);
+    // printf("\n\n**ENSURE LOG**\n");
+    // printf("************************************\n");
+    // printf("File Name: \t\t%s\n",fHandle->fileName);
+    // printf("File Size: \t\t%lld bytes\n",fileStat.st_size);
+    // printf("Total # Pages: \t%d\n",fHandle->totalNumPages);
     
     free(buff);
     fclose(fp);
