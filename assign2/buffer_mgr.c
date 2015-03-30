@@ -30,9 +30,8 @@ void printBoolArray(const char* objectName, bool *i_a, int length) {
 }
 
 // Initialize buffer metadate structure
-BM_PoolInfo *initPoolInfo(unsigned int numPages, SM_FileHandle *fh) {
-  BM_PoolInfo *pi = (BM_PoolInfo *)malloc(sizeof(BM_PoolInfo));
-
+RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
+  RC rc_code;
   pi->numPages = numPages;
   pi->fh = fh;
   pi->dirtys = (bool *)malloc(sizeof(bool) * numPages);
@@ -46,12 +45,64 @@ BM_PoolInfo *initPoolInfo(unsigned int numPages, SM_FileHandle *fh) {
     pi->fixCounter[i] = 0;
     pi->map[i] = i;
     pi->frames[i] = (char *)malloc(sizeof(char)*PAGE_SIZE);
-    for (j = 0; j < PAGE_SIZE; j++) {
-      pi->frames[i][j] = '\0';
-    }
+
+    printf("reading page %d from file %s\n", i, fh->fileName);
+
+    if(rc_code = readCurrentBlock (fh, (SM_PageHandle)pi->frames[i]) != RC_OK) return rc_code;
+
+    // for (j = 0; j < PAGE_SIZE; j++) {
+    //   pi->frames[i][j] = '\0';
+    // }
   }
 
-  return pi;
+  printf("end of method initPoolInfo\n");
+  return rc_code;
+}
+
+
+// Buffer Manager Interface Pool Handling
+RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName, 
+		  const int numPages, ReplacementStrategy strategy, 
+		  void *stratData) {
+  
+  RC rc_code;
+
+  SM_FileHandle *fHandle = (SM_FileHandle *)malloc(sizeof(SM_FileHandle));
+  fHandle->fileName = (char *)malloc(sizeof(char)*256);
+
+  printf("opening %s\n", pageFileName);
+
+  if ((rc_code = openPageFile(pageFileName, fHandle)) != RC_OK) return rc_code;
+
+  printf("opened %s\n", pageFileName);
+
+
+  bm->pageFile = pageFileName;
+  bm->numPages = numPages;
+  bm->strategy = strategy;
+  // bm->mgmtData = malloc(sizeof(BM_PoolInfo));
+  
+  BM_PoolInfo *pi = (BM_PoolInfo *)malloc(sizeof(BM_PoolInfo));
+
+  if((rc_code = initPoolInfo(numPages, fHandle, pi)) != RC_OK) return rc_code;
+  
+  bm->mgmtData = pi;
+
+  printf("numPages: %d\n", pi->numPages);
+  printf("dirtys: %s\n", pi->dirtys[0] ? "true" : "false");
+  printf("fixCounter: %d\n", pi->fixCounter[0]);
+  printf("map: %d\n", pi->map[0]);
+  printf("frames[0]: %s\n", pi->frames[0]);
+
+  // getFrameContents(bm);
+  // getDirtyFlags(bm);
+  // getFixCounts(bm);
+
+  // Needs the real initialization:
+  //    - some buffer header for storing info about dirty and pinned pages --> DONE
+  //    - the header will store fHandle pointer ?
+
+  return rc_code;
 }
 
 void free_pool(BM_BufferPool *bm) {
@@ -78,44 +129,6 @@ void free_pool(BM_BufferPool *bm) {
   printf("free(pi)\n");
   free(pi);
 
-}
-
-// Buffer Manager Interface Pool Handling
-RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName, 
-		  const int numPages, ReplacementStrategy strategy, 
-		  void *stratData) {
-  
-  RC rc_code;
-  BM_PoolInfo *pi;
-
-  SM_FileHandle *fHandle = (SM_FileHandle *)malloc(sizeof(SM_FileHandle));
-  fHandle->fileName = (char *)malloc(sizeof(char)*256);
-
-  if ((rc_code = openPageFile(pageFileName, fHandle)) != RC_OK) return rc_code;
-
-  bm->pageFile = pageFileName;
-  bm->numPages = numPages;
-  bm->strategy = strategy;
-  // bm->mgmtData = malloc(sizeof(BM_PoolInfo));
-  
-  bm->mgmtData = initPoolInfo(numPages, fHandle);
-  pi = (BM_PoolInfo *)(bm->mgmtData);
-
-  printf("numPages: %d\n", pi->numPages);
-  printf("dirtys: %s\n", pi->dirtys[0] ? "true" : "false");
-  printf("fixCounter: %d\n", pi->fixCounter[0]);
-  printf("map: %d\n", pi->map[0]);
-  printf("frames[0]: %s\n", pi->frames[0]);
-
-  // getFrameContents(bm);
-  // getDirtyFlags(bm);
-  // getFixCounts(bm);
-
-  // Needs the real initialization:
-  //    - some buffer header for storing info about dirty and pinned pages --> DONE
-  //    - the header will store fHandle pointer ?
-
-  return rc_code;
 }
 
 RC shutdownBufferPool(BM_BufferPool *const bm) {
@@ -164,6 +177,14 @@ RC forceFlushPool(BM_BufferPool *const bm) {
   // rc_code = openPageFile(bm->pageFile, fHandle);
 
   return rc_code;
+}
+
+void readPageFIFO() {
+
+}
+
+void readPageLRU() {
+  
 }
 
 // Buffer Manager Interface Access Pages
