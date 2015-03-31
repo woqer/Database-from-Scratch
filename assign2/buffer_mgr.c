@@ -68,18 +68,18 @@ RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
   for (i = 0; i < numPages; i++) {
     pi->dirtys[i] = false;
     pi->fixCounter[i] = 0;
-    pi->map[i] = i;
+    pi->map[i] = -1;
     pi->lru_stamp[i] = i;
     pi->frames[i] = (char *)malloc(sizeof(char)*PAGE_SIZE);
 
     // printf("reading page %d from file %s\n", i, fh->fileName);
 
-    if(rc_code = readCurrentBlock (fh, (SM_PageHandle)pi->frames[i]) != RC_OK)
-      return rc_code;
+    // if(rc_code = readCurrentBlock (fh, (SM_PageHandle)pi->frames[i]) != RC_OK)
+    //   return rc_code;
 
-    // for (j = 0; j < PAGE_SIZE; j++) {
-    //   pi->frames[i][j] = '\0';
-    // }
+    for (j = 0; j < PAGE_SIZE; j++) {
+      pi->frames[i][j] = '\0';
+    }
   }
 
   // printf("end of method initPoolInfo\n");
@@ -196,7 +196,7 @@ RC forceFlushPool(BM_BufferPool *const bm) {
     if ( pi->dirtys[i] && (pi->fixCounter[i] == 0) ) {
       // write page to disk
       SM_PageHandle memPage = pi->frames[i];
-      if (rc_code = writeBlock(i, pi->fh, (SM_PageHandle)pi->frames[i]) != RC_OK)
+      if (rc_code = writeBlock(pi->map[i], pi->fh, (SM_PageHandle)pi->frames[i]) != RC_OK)
         return rc_code;
       pi->dirtys[i] = false;
     }
@@ -209,7 +209,9 @@ RC forceFlushPool(BM_BufferPool *const bm) {
 
 RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page, 
       const PageNumber pageNum) {
-  RC rc_code;
+  RC rc_code = RC_OK;
+
+  printf("[fido] .... Begin of readPageFIFO(%d)\n", pageNum);
 
   int max_index = pi->numPages - 1;
   int index = pi->fifo_old;
@@ -226,17 +228,21 @@ RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page,
   SM_PageHandle memPage = pi->frames[index];
 
   if (pi->dirtys[index]) {
+    printf("[fido] ...... dirty page! writting to disk...\n");
     writeBlock(pi->map[index], fh, memPage);
 
   }
 
+  printf("[fido] ...... reading page from disk...\n");
+
   rc_code = readBlock(pageNum, fh, memPage);
 
+  page->data = memPage;
   // update control variables
-
+  printf("[fido] ...... reading done, updating control variables, index = %d\n",
+    index);
   pi->map[index] = pageNum;
-  pi->fixCounter[index]++; // should go from 0 to 1...
-
+  pi->fixCounter[index] = pi->fixCounter[index] + 1; // should go from 0 to 1...
   if (pi->fifo_old >= max_index) {
     pi->fifo_old = 0;
   } else {
@@ -263,6 +269,7 @@ int *update_lru(int index, int *ary, int length) {
 
 RC readPageLRU(BM_PoolInfo *const pi, BM_PageHandle *const page, 
       const PageNumber pageNum) {
+  printf("[fido] .... Begin of readPageLRU(%d)\n", pageNum);
   RC rc_code;
 
   int index = searchLowest(pi->lru_stamp, pi->numPages);
@@ -278,7 +285,7 @@ RC readPageLRU(BM_PoolInfo *const pi, BM_PageHandle *const page,
   }
 
   rc_code = readBlock(pageNum, fh, memPage);
-
+  page->data = memPage;
   // update fix count and lru array
 
   pi->map[index] = pageNum;
@@ -325,7 +332,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
 
   printf("[fido] Begin pinPage(%d)\n", pageNum);
 
-  RC rc_code;
+  RC rc_code = RC_OK;
 
   page->pageNum = pageNum;
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
@@ -333,9 +340,9 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
   int index = searchArray(pageNum, pi->map, bm->numPages);
 
   if (index < 0) {
-
+    printf("[fido] .. Page NOT on buffer, applying strategy...\n");
     if (searchArray(0, pi->fixCounter, pi->numPages) < 0) {
-      printf("[fido] .. WARNING!!! all pages pinned\n");
+      printf("[fido] .... WARNING!!! all pages pinned\n");
       return RC_PINNED_PAGES;
     }
 
@@ -354,13 +361,14 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
     }
   } else {
     // Page already on buffer frame!
+    printf("[fido] .. Yay! Page already on buffer frame\n");
     page->data = pi->frames[index];
     pi->fixCounter[index]++;
     if (bm->strategy == RS_LRU) {
       pi->lru_stamp = update_lru(index, pi->lru_stamp, pi->numPages);
     }
   }
-  
+  printf("[fido] End pinPage(%d)\n", pageNum);
   return rc_code;
 }
 
