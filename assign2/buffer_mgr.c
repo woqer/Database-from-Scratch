@@ -8,6 +8,8 @@ typedef struct BM_PoolInfo {
   bool *dirtys;     // dirty flags array
   int *fixCounter;  // fix counter array
   PageNumber *map;  // mapping between page frames and page numbers
+  int fifo_old;     // circular FIFO, index of the oldest added item
+  int *lru_stamp;         // usedstamp, beggins from 0
   char **frames;    // frames pointer array
 } BM_PoolInfo;
 
@@ -29,6 +31,27 @@ void printBoolArray(const char* objectName, bool *i_a, int length) {
   printf("%s]\n", i_a[length - 1] ? "true" : "false"); 
 }
 
+int searchArray(int x, int *a, int length) {
+  int i;
+  for (i = 0; i < length; i++) {
+    if (a[i] == x) return i;
+  }
+  return -1;
+}
+
+int searchLowest(int *a, int length) {
+  int i;
+  int x = a[0];
+  int j = 0;
+  for (i = 1; i < length; i++) {
+    if (a[i] < x) {
+      x = a[i];
+      j = i;
+    }
+  }
+  return j;
+}
+
 // Initialize buffer metadate structure
 RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
   RC rc_code;
@@ -37,6 +60,8 @@ RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
   pi->dirtys = (bool *)malloc(sizeof(bool) * numPages);
   pi->fixCounter = (int *)malloc(sizeof(int) * numPages);
   pi->map = (PageNumber *)malloc(sizeof(PageNumber) * numPages);
+  pi->fifo_old = 0;
+  pi->lru_stamp = (int *)malloc(sizeof(int) * numPages);
   pi->frames = malloc(numPages);
 
   int i, j;
@@ -44,18 +69,20 @@ RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
     pi->dirtys[i] = false;
     pi->fixCounter[i] = 0;
     pi->map[i] = i;
+    pi->lru_stamp[i] = i;
     pi->frames[i] = (char *)malloc(sizeof(char)*PAGE_SIZE);
 
-    printf("reading page %d from file %s\n", i, fh->fileName);
+    // printf("reading page %d from file %s\n", i, fh->fileName);
 
-    if(rc_code = readCurrentBlock (fh, (SM_PageHandle)pi->frames[i]) != RC_OK) return rc_code;
+    if(rc_code = readCurrentBlock (fh, (SM_PageHandle)pi->frames[i]) != RC_OK)
+      return rc_code;
 
     // for (j = 0; j < PAGE_SIZE; j++) {
     //   pi->frames[i][j] = '\0';
     // }
   }
 
-  printf("end of method initPoolInfo\n");
+  // printf("end of method initPoolInfo\n");
   return rc_code;
 }
 
@@ -64,17 +91,17 @@ RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
 RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName, 
 		  const int numPages, ReplacementStrategy strategy, 
 		  void *stratData) {
-  
+
   RC rc_code;
 
   SM_FileHandle *fHandle = (SM_FileHandle *)malloc(sizeof(SM_FileHandle));
   fHandle->fileName = (char *)malloc(sizeof(char)*256);
 
-  printf("opening %s\n", pageFileName);
+  // printf("opening %s\n", pageFileName);
 
   if ((rc_code = openPageFile(pageFileName, fHandle)) != RC_OK) return rc_code;
 
-  printf("opened %s\n", pageFileName);
+  // printf("opened %s\n", pageFileName);
 
 
   bm->pageFile = pageFileName;
@@ -88,11 +115,11 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
   
   bm->mgmtData = pi;
 
-  printf("numPages: %d\n", pi->numPages);
-  printf("dirtys: %s\n", pi->dirtys[0] ? "true" : "false");
-  printf("fixCounter: %d\n", pi->fixCounter[0]);
-  printf("map: %d\n", pi->map[0]);
-  printf("frames[0]: %s\n", pi->frames[0]);
+  // printf("numPages: %d\n", pi->numPages);
+  // printf("dirtys: %s\n", pi->dirtys[0] ? "true" : "false");
+  // printf("fixCounter: %d\n", pi->fixCounter[0]);
+  // printf("map: %d\n", pi->map[0]);
+  // printf("frames[0]: %s\n", pi->frames[0]);
 
   // getFrameContents(bm);
   // getDirtyFlags(bm);
@@ -169,7 +196,8 @@ RC forceFlushPool(BM_BufferPool *const bm) {
     if ( pi->dirtys[i] && (pi->fixCounter[i] == 0) ) {
       // write page to disk
       SM_PageHandle memPage = pi->frames[i];
-      if (rc_code = writeBlock(i, pi->fh, (SM_PageHandle)pi->frames[i]) != RC_OK) return rc_code;
+      if (rc_code = writeBlock(i, pi->fh, (SM_PageHandle)pi->frames[i]) != RC_OK)
+        return rc_code;
       pi->dirtys[i] = false;
     }
   }
@@ -179,11 +207,86 @@ RC forceFlushPool(BM_BufferPool *const bm) {
   return rc_code;
 }
 
-void readPageFIFO() {
+RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page, 
+      const PageNumber pageNum) {
+  RC rc_code;
 
+  int max_index = pi->numPages - 1;
+  int index = pi->fifo_old;
+
+  while(pi->fixCounter[index] > 0) {
+    if (index >= max_index) {
+      index = 0;
+    } else {
+      index++;
+    }
+  }
+
+  SM_FileHandle *fh = pi->fh;
+  SM_PageHandle memPage = pi->frames[index];
+
+  if (pi->dirtys[index]) {
+    writeBlock(pi->map[index], fh, memPage);
+
+  }
+
+  rc_code = readBlock(pageNum, fh, memPage);
+
+  // update control variables
+
+  pi->map[index] = pageNum;
+  pi->fixCounter[index]++; // should go from 0 to 1...
+
+  if (pi->fifo_old >= max_index) {
+    pi->fifo_old = 0;
+  } else {
+    pi->fifo_old++;
+  }
+
+  return rc_code;
 }
 
-void readPageLRU() {
+int *update_lru(int index, int *ary, int length) {
+  int max = length - 1;
+  int *result = ary;
+  int pointer;
+
+  // if (searchArray(max, ary, length) == index) return ary;
+
+  while ((pointer = searchArray(max, ary, length)) != index) {
+    result[pointer]--;
+    max--;
+  }
+
+  return result;
+}
+
+RC readPageLRU(BM_PoolInfo *const pi, BM_PageHandle *const page, 
+      const PageNumber pageNum) {
+  RC rc_code;
+
+  int index = searchLowest(pi->lru_stamp, pi->numPages);
+
+  SM_FileHandle *fh = pi->fh;
+  SM_PageHandle memPage = pi->frames[index];
+
+  if (pi->fixCounter[index] > 0) return RC_PINNED_LRU;
+
+  if (pi->dirtys[index]) {
+    writeBlock(pi->map[index], fh, memPage);
+
+  }
+
+  rc_code = readBlock(pageNum, fh, memPage);
+
+  // update fix count and lru array
+
+  pi->map[index] = pageNum;
+  pi->fixCounter[index]++;
+
+  pi->lru_stamp = update_lru(index, pi->lru_stamp, pi->numPages);
+
+  return rc_code;
   
 }
 
@@ -220,12 +323,45 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
   // of course, pin the Page, that is write the info to the buffer header
   // and increment fix count
 
-  page->pageNum = pageNum;
+  printf("[fido] Begin pinPage(%d)\n", pageNum);
 
-  // page data should be retrieved from buffer header
-  page->data = (char *)malloc(sizeof(char)*PAGE_SIZE); // Fix in the future!
+  RC rc_code;
+
+  page->pageNum = pageNum;
+  BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
+
+  int index = searchArray(pageNum, pi->map, bm->numPages);
+
+  if (index < 0) {
+
+    if (searchArray(0, pi->fixCounter, pi->numPages) < 0) {
+      printf("[fido] .. WARNING!!! all pages pinned\n");
+      return RC_PINNED_PAGES;
+    }
+
+    // Apply strategy
+    switch (bm->strategy)
+    {
+    case RS_FIFO:
+      rc_code = readPageFIFO(pi, page, pageNum);
+      break;
+    case RS_LRU:
+      rc_code = readPageLRU(pi, page, pageNum);
+      break;
+    default:
+      printf("Strategy not implemented: %i\n", bm->strategy);
+      break;
+    }
+  } else {
+    // Page already on buffer frame!
+    page->data = pi->frames[index];
+    pi->fixCounter[index]++;
+    if (bm->strategy == RS_LRU) {
+      pi->lru_stamp = update_lru(index, pi->lru_stamp, pi->numPages);
+    }
+  }
   
-  return RC_OK;
+  return rc_code;
 }
 
 // Statistics Interface
