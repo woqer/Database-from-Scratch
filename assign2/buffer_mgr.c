@@ -2,6 +2,9 @@
 #include "storage_mgr.h"
 #include <stdlib.h>
 
+static int NumReadIO = 0;
+static int NumWriteIO = 0;
+
 typedef struct BM_PoolInfo {
   int numPages;
   SM_FileHandle *fh; // file handler of page file associated with buffer pool
@@ -115,6 +118,9 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
   
   bm->mgmtData = pi;
 
+  NumWriteIO = 0;
+  NumReadIO = 0;
+
   // printf("numPages: %d\n", pi->numPages);
   // printf("dirtys: %s\n", pi->dirtys[0] ? "true" : "false");
   // printf("fixCounter: %d\n", pi->fixCounter[0]);
@@ -138,22 +144,22 @@ void free_pool(BM_BufferPool *bm) {
 
   int i;
   for (i = 0; i < bm->numPages; i++) {
-    printf("free(pi->frames[%d])\n", i);
+    // printf("free(pi->frames[%d])\n", i);
     free(pi->frames[i]);
   }
-  printf("free(pi->frames)\n");
+  // printf("free(pi->frames)\n");
   free(pi->frames);
-  printf("free(pi->map)\n");
+  // printf("free(pi->map)\n");
   free(pi->map);
-  printf("free(pi->fixCounter)\n");
+  // printf("free(pi->fixCounter)\n");
   free(pi->fixCounter);
-  printf("free(pi->dirtys)\n");
+  // printf("free(pi->dirtys)\n");
   free(pi->dirtys);
 
-  printf("free(fh)\n");
+  // printf("free(fh)\n");
   free(fh);
 
-  printf("free(pi)\n");
+  // printf("free(pi)\n");
   free(pi);
 
 }
@@ -196,7 +202,10 @@ RC forceFlushPool(BM_BufferPool *const bm) {
     if ( pi->dirtys[i] && (pi->fixCounter[i] == 0) ) {
       // write page to disk
       SM_PageHandle memPage = pi->frames[i];
-      if (rc_code = writeBlock(pi->map[i], pi->fh, (SM_PageHandle)pi->frames[i]) != RC_OK)
+
+      rc_code = writeBlock(pi->map[i], pi->fh, (SM_PageHandle)pi->frames[i]);
+      NumWriteIO++;
+      if (rc_code != RC_OK)
         return rc_code;
       pi->dirtys[i] = false;
     }
@@ -211,7 +220,7 @@ RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page,
       const PageNumber pageNum) {
   RC rc_code = RC_OK;
 
-  printf("[fido] .... Begin of readPageFIFO(%d)\n", pageNum);
+  // printf("[fido] .... Begin of readPageFIFO(%d)\n", pageNum);
 
   int max_index = pi->numPages - 1;
   int index = pi->fifo_old;
@@ -228,21 +237,29 @@ RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page,
   SM_PageHandle memPage = pi->frames[index];
 
   if (pi->dirtys[index]) {
-    printf("[fido] ...... dirty page! writting to disk...\n");
+    // printf("[fido] ...... dirty page! writting to disk...\n");
     writeBlock(pi->map[index], fh, memPage);
-
+    NumWriteIO++;
+    pi->dirtys[index] = false;
   }
 
-  printf("[fido] ...... reading page from disk...\n");
+  if (pageNum >= fh->totalNumPages) {
+    // printf("[fido] ...... non-existing page, appending new one to disk...\n");
+    rc_code = appendEmptyBlock(fh);
+    // NumWriteIO++;
+    if (rc_code != RC_OK) return rc_code;
+  }
 
+  // printf("[fido] ...... reading page from disk...\n");
   rc_code = readBlock(pageNum, fh, memPage);
+  NumReadIO++;
 
   page->data = memPage;
   // update control variables
-  printf("[fido] ...... reading done, updating control variables, index = %d\n",
-    index);
+  // printf("[fido] ...... reading done, updating control variables, index = %d\n",
+    // index);
   pi->map[index] = pageNum;
-  pi->fixCounter[index] = pi->fixCounter[index] + 1; // should go from 0 to 1...
+  pi->fixCounter[index]++; // should go from 0 to 1...
   if (pi->fifo_old >= max_index) {
     pi->fifo_old = 0;
   } else {
@@ -269,7 +286,7 @@ int *update_lru(int index, int *ary, int length) {
 
 RC readPageLRU(BM_PoolInfo *const pi, BM_PageHandle *const page, 
       const PageNumber pageNum) {
-  printf("[fido] .... Begin of readPageLRU(%d)\n", pageNum);
+  // printf("[fido] .... Begin of readPageLRU(%d)\n", pageNum);
   RC rc_code;
 
   int index = searchLowest(pi->lru_stamp, pi->numPages);
@@ -281,10 +298,19 @@ RC readPageLRU(BM_PoolInfo *const pi, BM_PageHandle *const page,
 
   if (pi->dirtys[index]) {
     writeBlock(pi->map[index], fh, memPage);
+    NumWriteIO++;
+    pi->dirtys[index] = false;
+  }
 
+  if (pageNum >= fh->totalNumPages) {
+    // printf("[fido] ...... non-existing page, appending new one to disk...\n");
+    rc_code = appendEmptyBlock(fh);
+    // NumWriteIO++;
+    if (rc_code != RC_OK) return rc_code;
   }
 
   rc_code = readBlock(pageNum, fh, memPage);
+  NumReadIO++;
   page->data = memPage;
   // update fix count and lru array
 
@@ -300,13 +326,21 @@ RC readPageLRU(BM_PoolInfo *const pi, BM_PageHandle *const page,
 // Buffer Manager Interface Access Pages
 RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page) {
   // page->pageNum is dirty, mark it in buffer header
+  BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
+  int index = searchArray(page->pageNum, pi->map, pi->numPages);
+  pi->dirtys[index] = true;
   return RC_OK;
 }
 
 RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page) {
   // unpin the page, decrement fix count
-  // strategy will take over the replacement in memory
-  // making a decition based on unpinned, dirty and fixcount
+  BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
+  int index = searchArray(page->pageNum, pi->map, pi->numPages);
+  pi->fixCounter[index]--;
+
+  if (bm->strategy == RS_LRU) {
+    pi->lru_stamp = update_lru(index, pi->lru_stamp, pi->numPages);
+  }
   return RC_OK;
 }
 
@@ -316,7 +350,16 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
   // read fHandle pointer from buffer header
   // from buffer reader, get the pointer to page and store it in memPage
   // writeBlock(page->numPage, fHandle, memPage);
+  RC rc_code;
+  BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
+  SM_FileHandle *fh = pi->fh;
+  int index = searchArray(page->pageNum, pi->map, pi->numPages);
+  rc_code = writeBlock(pi->map[index], fh, pi->frames[index]);
+  NumWriteIO++;
+  if (rc_code != RC_OK)
+    return rc_code;
 
+  pi->dirtys[index] = false;
 
   return RC_OK;
 }
@@ -330,7 +373,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
   // of course, pin the Page, that is write the info to the buffer header
   // and increment fix count
 
-  printf("[fido] Begin pinPage(%d)\n", pageNum);
+  // printf("[fido] Begin pinPage(%d)\n", pageNum);
 
   RC rc_code = RC_OK;
 
@@ -340,9 +383,9 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
   int index = searchArray(pageNum, pi->map, bm->numPages);
 
   if (index < 0) {
-    printf("[fido] .. Page NOT on buffer, applying strategy...\n");
+    // printf("[fido] .. Page NOT on buffer, applying strategy...\n");
     if (searchArray(0, pi->fixCounter, pi->numPages) < 0) {
-      printf("[fido] .... WARNING!!! all pages pinned\n");
+      // printf("[fido] .... WARNING!!! all pages pinned\n");
       return RC_PINNED_PAGES;
     }
 
@@ -361,14 +404,14 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
     }
   } else {
     // Page already on buffer frame!
-    printf("[fido] .. Yay! Page already on buffer frame\n");
+    // printf("[fido] .. Yay! Page already on buffer frame\n");
     page->data = pi->frames[index];
     pi->fixCounter[index]++;
     if (bm->strategy == RS_LRU) {
       pi->lru_stamp = update_lru(index, pi->lru_stamp, pi->numPages);
     }
   }
-  printf("[fido] End pinPage(%d)\n", pageNum);
+  // printf("[fido] End pinPage(%d)\n", pageNum);
   return rc_code;
 }
 
@@ -401,8 +444,8 @@ int *getFixCounts (BM_BufferPool *const bm) {
 }
 
 int getNumReadIO (BM_BufferPool *const bm) {
-  return 1;
+  return NumReadIO;
 }
 int getNumWriteIO (BM_BufferPool *const bm) {
-  return 1;
+  return NumWriteIO;
 }

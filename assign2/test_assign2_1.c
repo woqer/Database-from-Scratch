@@ -113,10 +113,12 @@ checkDummyPages(BM_BufferPool *bm, int num)
       CHECK(unpinPage(bm,h));
     }
 
+  printf("shutting down pool after asserting %d pages...\n", num);
   CHECK(shutdownBufferPool(bm));
 
   free(expected);
   free(h);
+  printf("Everything free after shutdown\n");
 }
 
 void

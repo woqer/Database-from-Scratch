@@ -5,7 +5,7 @@
 #include "unistd.h"
 #include "string.h"
 
-#define HEADER_SIZE 4
+#define HEADER_SIZE 5
 
 /************************************************************
  *                    Functions definitions                 *
@@ -42,7 +42,8 @@ writeHeader (FILE *fp, int totalNumPages)
 
 	header = (char*)malloc(sizeof(char)*HEADER_SIZE);
 
-	sprintf(header, "%04d", totalNumPages);
+  sprintf(header, "%05d", totalNumPages);
+	printf("%05d\n", totalNumPages);
 
 	fseek(fp, 0L, SEEK_SET);
 	if ((size_header = fwrite(header, sizeof(char)*HEADER_SIZE, 1, fp)) < 1) {
