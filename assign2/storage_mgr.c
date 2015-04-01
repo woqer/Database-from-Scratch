@@ -5,7 +5,9 @@
 #include "unistd.h"
 #include "string.h"
 
-#define HEADER_SIZE 5
+// #define HEADER_SIZE 6
+
+static int HEADER_SIZE = 6;
 
 /************************************************************
  *                    Functions definitions                 *
@@ -17,17 +19,24 @@
 int
 readHeader (FILE *fp)
 {
-	char *header, *buff;
+  int head_size;
+  char *buff;
+  // char *header_str;
 	
-	header = (char*)malloc(sizeof(char)*HEADER_SIZE);
-	buff = (char*)malloc(sizeof(char)*PAGE_SIZE);
+  buff = (char *)malloc(sizeof(char) * PAGE_SIZE);
+	// header_str = (char *)malloc(16);
 
-	fread(header, sizeof(char)*HEADER_SIZE, 1, fp);
+  // fread(header_str, sizeof(char)*HEADER_SIZE, 1, fp);
+	fread(buff, sizeof(char)*HEADER_SIZE, 1, fp);
+  head_size = atoi(buff);
 	fread(buff, sizeof(char)*(PAGE_SIZE - HEADER_SIZE), 1, fp);
 
 	free(buff);
 
-	return atoi(header);
+
+  // free(header_str);
+
+	return head_size;
 }
 
 /* Write the value of totalNumPages to the header page, appending '\0' after it in header page.
@@ -42,8 +51,8 @@ writeHeader (FILE *fp, int totalNumPages)
 
 	header = (char*)malloc(sizeof(char)*HEADER_SIZE);
 
-  sprintf(header, "%05d", totalNumPages);
-	printf("%05d\n", totalNumPages);
+  sprintf(header, "%06d", totalNumPages);
+	// printf("%06d\n", totalNumPages);
 
 	fseek(fp, 0L, SEEK_SET);
 	if ((size_header = fwrite(header, sizeof(char)*HEADER_SIZE, 1, fp)) < 1) {
