@@ -51,6 +51,30 @@ main (void)
   testLRU();
 }
 
+void checkLast(BM_BufferPool *bm) {
+  int i;
+  BM_PageHandle *h = MAKE_PAGE_HANDLE();
+
+  CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_FIFO, NULL));
+
+  CHECK(pinPage(bm, h, 9999));
+  printf("PageNum: %d\n", h->pageNum);
+
+  // TEST_DONE();
+  // exit(0);
+  
+  sprintf(h->data, "Last one 9999");
+  CHECK(markDirty(bm, h));
+  CHECK(unpinPage(bm,h));
+
+  CHECK(shutdownBufferPool(bm));
+
+  free(h);
+
+  TEST_DONE();
+  exit(0);
+}
+
 // create n pages with content "Page X" and read them back to check whether the content is right
 void
 testCreatingAndReadingDummyPages (void)
@@ -58,12 +82,22 @@ testCreatingAndReadingDummyPages (void)
   BM_BufferPool *bm = MAKE_POOL();
   testName = "Creating and Reading Back Dummy Pages";
 
-  CHECK(createPageFile("testbuffer.bin"));
+  // CHECK(createPageFile("testbuffer.bin"));
 
-  createDummyPages(bm, 22);
-  checkDummyPages(bm, 20);
+  // createDummyPages(bm, 22);
+  // checkDummyPages(bm, 22);
+
+  // TEST_DONE();
+  // exit(0);
 
   createDummyPages(bm, 10000);
+
+  // checkLast(bm);
+
+  // free(bm);
+  // TEST_DONE();
+  // exit(0);
+  
   checkDummyPages(bm, 10000);
 
   CHECK(destroyPageFile("testbuffer.bin"));
@@ -81,7 +115,7 @@ createDummyPages(BM_BufferPool *bm, int num)
 
   CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_FIFO, NULL));
   
-  for (i = 0; i < num; i++)
+  for (i = 9995; i < num; i++)
     {
       CHECK(pinPage(bm, h, i));
       sprintf(h->data, "%s-%i", "Page", h->pageNum);
@@ -103,7 +137,7 @@ checkDummyPages(BM_BufferPool *bm, int num)
 
   CHECK(initBufferPool(bm, "testbuffer.bin", 3, RS_FIFO, NULL));
 
-  for (i = 0; i < num; i++)
+  for (i = 9995; i < num; i++)
     {
       CHECK(pinPage(bm, h, i));
 
@@ -113,10 +147,12 @@ checkDummyPages(BM_BufferPool *bm, int num)
       CHECK(unpinPage(bm,h));
     }
 
+  printf("shutting down pool after asserting %d pages...\n", num);
   CHECK(shutdownBufferPool(bm));
 
   free(expected);
   free(h);
+  printf("Everything free after shutdown\n");
 }
 
 void

@@ -1,6 +1,7 @@
 #include "buffer_mgr.h"
 #include "storage_mgr.h"
 #include <stdlib.h>
+// #include <string.h>
 
 static int NumReadIO = 0;
 static int NumWriteIO = 0;
@@ -9,12 +10,12 @@ static int NumWriteIO = 0;
  */
 typedef struct BM_PoolInfo {
   int numPages;
-  SM_FileHandle *fh; // file handler of page file associated with buffer pool
+  SM_FileHandle *fh;// file handler of page file associated with buffer pool
   bool *dirtys;     // dirty flags array
   int *fixCounter;  // fix counter array
   PageNumber *map;  // mapping between page frames and page numbers
   int fifo_old;     // circular FIFO, index of the oldest added item
-  int *lru_stamp;         // usedstamp, beggins from 0
+  int *lru_stamp;   // used stamp, begins at 0
   char **frames;    // frames pointer array
 } BM_PoolInfo;
 
@@ -26,7 +27,7 @@ typedef struct BM_PoolInfo {
  * The elements start at index 0 and ends at index length-1.
  */
 void printIntArray(const char* objectName, int *i_a, int length) {
-  printf("%s: [", objectName);
+  printf("%s:\t\t [", objectName);
   int i;
   for (i = 0; i < (length - 1); i++) {
     printf("%d, ", i_a[i]);
@@ -38,12 +39,41 @@ void printIntArray(const char* objectName, int *i_a, int length) {
  * The elements start at index 0 and ends at index length-1.
  */
 void printBoolArray(const char* objectName, bool *i_a, int length) {
-  printf("%s: [", objectName);
+  printf("%s:\t\t [", objectName);
   int i;
   for (i = 0; i < (length - 1); i++) {
     printf("%s, ", i_a[i] ? "true" : "false");
   }
   printf("%s]\n", i_a[length - 1] ? "true" : "false"); 
+}
+
+/* A function to linearly search a target integer in an integer array.
+ * The index of the target is returned if found, -1 if not found.
+ * The search start at index 0 and ends at index length-1.
+ */
+void printStrArray(const char* objectName, char **i_a, int length) {
+  printf("%s:\t\t [", objectName);
+  int i;
+  for (i = 0; i < (length - 1); i++) {
+    printf("\"%s\", ", i_a[i]);
+  }
+  printf("\"%s\"]\n", i_a[length - 1]); 
+}
+
+/* A function to print all pool information. 
+ */
+void printPoolInfo(BM_PoolInfo *pi) {
+  SM_FileHandle *fh = pi->fh;
+  printf("numPages:\t\t %d\n", pi->numPages);
+  printf("fh->fileName:\t\t %s\n", fh->fileName);
+  printf("fh->totalNumPages:\t\t %d\n", fh->totalNumPages);
+  printBoolArray("dirtys", pi->dirtys, pi->numPages);
+  printIntArray("fixCounter", pi->fixCounter, pi->numPages);
+  printIntArray("map", pi->map, pi->numPages);
+  printf("fifo_old:\t\t %d\n", pi->fifo_old);
+  printIntArray("lru_stamp", pi->lru_stamp, pi->numPages);
+  printStrArray("frames", pi->frames, pi->numPages);
+
 }
 
 /* A function to linearly search a target integer in an integer array.
@@ -58,8 +88,7 @@ int searchArray(int x, int *a, int length) {
   return -1;
 }
 
-/* A function to linearly search a target integer in an integer array.
- * The index of the target is returned if found, -1 if not found.
+/* A function to linearly search the lowest value in an integer array.
  * The search start at index 0 and ends at index length-1.
  */
 int searchLowest(int *a, int length) {
@@ -75,7 +104,6 @@ int searchLowest(int *a, int length) {
   return j;
 }
 
-// Initialize buffer metadate structure
 /* A function to initialize buffer meta data structure, which are kept in BM_PoolInfo.
  */
 RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
@@ -87,7 +115,7 @@ RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
   pi->map = (PageNumber *)malloc(sizeof(PageNumber) * numPages);
   pi->fifo_old = 0;
   pi->lru_stamp = (int *)malloc(sizeof(int) * numPages);
-  pi->frames = malloc(numPages);
+  pi->frames = (char **)malloc(sizeof(char *) * numPages);
 
   int i, j;
   for (i = 0; i < numPages; i++) {
@@ -97,22 +125,15 @@ RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
     pi->lru_stamp[i] = i;
     pi->frames[i] = (char *)malloc(sizeof(char)*PAGE_SIZE);
 
-    // printf("reading page %d from file %s\n", i, fh->fileName);
-
-    // if(rc_code = readCurrentBlock (fh, (SM_PageHandle)pi->frames[i]) != RC_OK)
-    //   return rc_code;
-
     for (j = 0; j < PAGE_SIZE; j++) {
       pi->frames[i][j] = '\0';
     }
   }
 
-  // printf("end of method initPoolInfo\n");
   return rc_code;
 }
 
 
-// Buffer Manager Interface Pool Handling
 /* A function to initialize buffer pool handler.
  */
 RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName, 
@@ -124,11 +145,8 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
   SM_FileHandle *fHandle = (SM_FileHandle *)malloc(sizeof(SM_FileHandle));
   fHandle->fileName = (char *)malloc(sizeof(char)*256);
 
-  // printf("opening %s\n", pageFileName);
 
   if ((rc_code = openPageFile(pageFileName, fHandle)) != RC_OK) return rc_code;
-
-  // printf("opened %s\n", pageFileName);
 
 
   bm->pageFile = pageFileName;
@@ -144,20 +162,6 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
 
   NumWriteIO = 0;
   NumReadIO = 0;
-
-  // printf("numPages: %d\n", pi->numPages);
-  // printf("dirtys: %s\n", pi->dirtys[0] ? "true" : "false");
-  // printf("fixCounter: %d\n", pi->fixCounter[0]);
-  // printf("map: %d\n", pi->map[0]);
-  // printf("frames[0]: %s\n", pi->frames[0]);
-
-  // getFrameContents(bm);
-  // getDirtyFlags(bm);
-  // getFixCounts(bm);
-
-  // Needs the real initialization:
-  //    - some buffer header for storing info about dirty and pinned pages --> DONE
-  //    - the header will store fHandle pointer ?
 
   return rc_code;
 }
@@ -218,7 +222,7 @@ RC shutdownBufferPool(BM_BufferPool *const bm) {
 
 }
 
-/* A function to write all the dirty pages to the page file in disk.
+/* A function to write all the dirty pages with fixed count 0 to the page file in disk.
  */
 RC forceFlushPool(BM_BufferPool *const bm) {
   // read from buffer and write to disk only dirty pages with fixed count 0
@@ -234,7 +238,7 @@ RC forceFlushPool(BM_BufferPool *const bm) {
       // write page to disk
       SM_PageHandle memPage = pi->frames[i];
 
-      rc_code = writeBlock(pi->map[i], pi->fh, (SM_PageHandle)pi->frames[i]);
+      rc_code = writeBlock(pi->map[i], pi->fh, memPage);
       NumWriteIO++;
       if (rc_code != RC_OK)
         return rc_code;
@@ -242,16 +246,15 @@ RC forceFlushPool(BM_BufferPool *const bm) {
     }
   }
 
-  // rc_code = openPageFile(bm->pageFile, fHandle);
-
   return rc_code;
 }
 
+/* A function to update the fifo page information when needed. 
+ * The function finds and updates the oldest page and replace it.
+ */
 RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page, 
       const PageNumber pageNum) {
   RC rc_code = RC_OK;
-
-  // printf("[fido] .... Begin of readPageFIFO(%d)\n", pageNum);
 
   int max_index = pi->numPages - 1;
   int index = pi->fifo_old;
@@ -268,27 +271,22 @@ RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page,
   SM_PageHandle memPage = pi->frames[index];
 
   if (pi->dirtys[index]) {
-    // printf("[fido] ...... dirty page! writting to disk...\n");
     writeBlock(pi->map[index], fh, memPage);
     NumWriteIO++;
     pi->dirtys[index] = false;
   }
 
   if (pageNum >= fh->totalNumPages) {
-    // printf("[fido] ...... non-existing page, appending new one to disk...\n");
     rc_code = appendEmptyBlock(fh);
     // NumWriteIO++;
     if (rc_code != RC_OK) return rc_code;
   }
 
-  // printf("[fido] ...... reading page from disk...\n");
   rc_code = readBlock(pageNum, fh, memPage);
   NumReadIO++;
 
   page->data = memPage;
   // update control variables
-  // printf("[fido] ...... reading done, updating control variables, index = %d\n",
-    // index);
   pi->map[index] = pageNum;
   pi->fixCounter[index]++; // should go from 0 to 1...
   if (pi->fifo_old >= max_index) {
@@ -300,24 +298,39 @@ RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page,
   return rc_code;
 }
 
-int *update_lru(int index, int *ary, int length) {
+/* A function to update the lru page information when needed. 
+ */
+void update_lru(int index, int *ary, int length) {
   int max = length - 1;
-  int *result = ary;
   int pointer;
 
-  // if (searchArray(max, ary, length) == index) return ary;
-
-  while ((pointer = searchArray(max, ary, length)) != index) {
+  int *result;
+  result =  (int *)malloc(sizeof(int) * length);
+  int i;
+  for(i = 0; i <length; i++) {
+    *(result + i) = *(ary + i);
+  }
+  
+  pointer = searchArray(max, ary, length);
+  while (( pointer != index) && max > 0) {
     result[pointer]--;
     max--;
+    pointer = searchArray(max, ary, length);
   }
 
-  return result;
+  result[index] = length - 1;
+
+  for(i = 0; i <length; i++) {
+    *(ary + i) = *(result + i);
+  }
+
+  free(result);
 }
 
+/* A function to update the lru page information when needed. 
+ */
 RC readPageLRU(BM_PoolInfo *const pi, BM_PageHandle *const page, 
       const PageNumber pageNum) {
-  // printf("[fido] .... Begin of readPageLRU(%d)\n", pageNum);
   RC rc_code;
 
   int index = searchLowest(pi->lru_stamp, pi->numPages);
@@ -334,7 +347,6 @@ RC readPageLRU(BM_PoolInfo *const pi, BM_PageHandle *const page,
   }
 
   if (pageNum >= fh->totalNumPages) {
-    // printf("[fido] ...... non-existing page, appending new one to disk...\n");
     rc_code = appendEmptyBlock(fh);
     // NumWriteIO++;
     if (rc_code != RC_OK) return rc_code;
@@ -343,18 +355,19 @@ RC readPageLRU(BM_PoolInfo *const pi, BM_PageHandle *const page,
   rc_code = readBlock(pageNum, fh, memPage);
   NumReadIO++;
   page->data = memPage;
+ 
   // update fix count and lru array
-
   pi->map[index] = pageNum;
   pi->fixCounter[index]++;
 
-  pi->lru_stamp = update_lru(index, pi->lru_stamp, pi->numPages);
+  update_lru(index, pi->lru_stamp, pi->numPages);
 
   return rc_code;
   
 }
 
-// Buffer Manager Interface Access Pages
+/* A function to label a page as dirty.
+ */
 RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page) {
   // page->pageNum is dirty, mark it in buffer header
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
@@ -363,18 +376,22 @@ RC markDirty (BM_BufferPool *const bm, BM_PageHandle *const page) {
   return RC_OK;
 }
 
+/* A function to unpin a page when a user finishes using it.
+ */
 RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page) {
   // unpin the page, decrement fix count
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
   int index = searchArray(page->pageNum, pi->map, pi->numPages);
   pi->fixCounter[index]--;
 
-  if (bm->strategy == RS_LRU) {
-    pi->lru_stamp = update_lru(index, pi->lru_stamp, pi->numPages);
-  }
+  // if (bm->strategy == RS_LRU) {
+  //   pi->lru_stamp = update_lru(index, pi->lru_stamp, pi->numPages);
+  // }
   return RC_OK;
 }
 
+/* A function to writes a page to the disk.
+ */
 RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
   // writes page to disk
 
@@ -395,6 +412,8 @@ RC forcePage (BM_BufferPool *const bm, BM_PageHandle *const page) {
   return RC_OK;
 }
 
+/* A function to pin a page when a user starts using it.
+ */
 RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page, 
 	    const PageNumber pageNum) {
   // read header from mgmtData
@@ -404,8 +423,6 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
   // of course, pin the Page, that is write the info to the buffer header
   // and increment fix count
 
-  // printf("[fido] Begin pinPage(%d)\n", pageNum);
-
   RC rc_code = RC_OK;
 
   page->pageNum = pageNum;
@@ -414,9 +431,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
   int index = searchArray(pageNum, pi->map, bm->numPages);
 
   if (index < 0) {
-    // printf("[fido] .. Page NOT on buffer, applying strategy...\n");
     if (searchArray(0, pi->fixCounter, pi->numPages) < 0) {
-      // printf("[fido] .... WARNING!!! all pages pinned\n");
       return RC_PINNED_PAGES;
     }
 
@@ -435,18 +450,18 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
     }
   } else {
     // Page already on buffer frame!
-    // printf("[fido] .. Yay! Page already on buffer frame\n");
     page->data = pi->frames[index];
     pi->fixCounter[index]++;
     if (bm->strategy == RS_LRU) {
-      pi->lru_stamp = update_lru(index, pi->lru_stamp, pi->numPages);
+      update_lru(index, pi->lru_stamp, pi->numPages);
     }
   }
-  // printf("[fido] End pinPage(%d)\n", pageNum);
   return rc_code;
 }
 
 // Statistics Interface
+/* A function to get the frame contents.
+ */
 PageNumber *getFrameContents (BM_BufferPool *const bm) {
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
   PageNumber *pn = pi->map;
@@ -456,6 +471,8 @@ PageNumber *getFrameContents (BM_BufferPool *const bm) {
   return pn;
 }
 
+/* A function to get the dirty flags.
+ */
 bool *getDirtyFlags (BM_BufferPool *const bm) {
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
   bool *df = pi->dirtys;
@@ -465,6 +482,8 @@ bool *getDirtyFlags (BM_BufferPool *const bm) {
   return df;
 }
 
+/* A function to get the fix counts.
+ */
 int *getFixCounts (BM_BufferPool *const bm) {
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
   int *fc = pi->fixCounter;
