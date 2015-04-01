@@ -5,6 +5,8 @@
 static int NumReadIO = 0;
 static int NumWriteIO = 0;
 
+/* A structure that stores bookkeeping data of buffer manager pool. 
+ */
 typedef struct BM_PoolInfo {
   int numPages;
   SM_FileHandle *fh; // file handler of page file associated with buffer pool
@@ -16,6 +18,13 @@ typedef struct BM_PoolInfo {
   char **frames;    // frames pointer array
 } BM_PoolInfo;
 
+/************************************************************
+ *                    Functions definitions                 *
+ ************************************************************/
+
+/* A function to print elements in an integer array.
+ * The elements start at index 0 and ends at index length-1.
+ */
 void printIntArray(const char* objectName, int *i_a, int length) {
   printf("%s: [", objectName);
   int i;
@@ -25,6 +34,9 @@ void printIntArray(const char* objectName, int *i_a, int length) {
   printf("%d]\n", i_a[length - 1]);
 }
 
+/* A function to print elements in a boolean array.
+ * The elements start at index 0 and ends at index length-1.
+ */
 void printBoolArray(const char* objectName, bool *i_a, int length) {
   printf("%s: [", objectName);
   int i;
@@ -34,6 +46,10 @@ void printBoolArray(const char* objectName, bool *i_a, int length) {
   printf("%s]\n", i_a[length - 1] ? "true" : "false"); 
 }
 
+/* A function to linearly search a target integer in an integer array.
+ * The index of the target is returned if found, -1 if not found.
+ * The search start at index 0 and ends at index length-1.
+ */
 int searchArray(int x, int *a, int length) {
   int i;
   for (i = 0; i < length; i++) {
@@ -42,6 +58,10 @@ int searchArray(int x, int *a, int length) {
   return -1;
 }
 
+/* A function to linearly search a target integer in an integer array.
+ * The index of the target is returned if found, -1 if not found.
+ * The search start at index 0 and ends at index length-1.
+ */
 int searchLowest(int *a, int length) {
   int i;
   int x = a[0];
@@ -56,6 +76,8 @@ int searchLowest(int *a, int length) {
 }
 
 // Initialize buffer metadate structure
+/* A function to initialize buffer meta data structure, which are kept in BM_PoolInfo.
+ */
 RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
   RC rc_code;
   pi->numPages = numPages;
@@ -91,6 +113,8 @@ RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
 
 
 // Buffer Manager Interface Pool Handling
+/* A function to initialize buffer pool handler.
+ */
 RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName, 
 		  const int numPages, ReplacementStrategy strategy, 
 		  void *stratData) {
@@ -138,6 +162,8 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
   return rc_code;
 }
 
+/* A function to free buffer pool handler.
+ */
 void free_pool(BM_BufferPool *bm) {
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
   SM_FileHandle *fh = (SM_FileHandle *)pi->fh;
@@ -164,6 +190,9 @@ void free_pool(BM_BufferPool *bm) {
 
 }
 
+/* A function to shut down the buffer pool, it writes all the dirty pages 
+ * to the page file in disk.
+ */
 RC shutdownBufferPool(BM_BufferPool *const bm) {
   // Needs comprobation of dirty and pinned
   RC rc_code;
@@ -189,6 +218,8 @@ RC shutdownBufferPool(BM_BufferPool *const bm) {
 
 }
 
+/* A function to write all the dirty pages to the page file in disk.
+ */
 RC forceFlushPool(BM_BufferPool *const bm) {
   // read from buffer and write to disk only dirty pages with fixed count 0
   RC rc_code;
