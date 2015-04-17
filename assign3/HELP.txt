@@ -1,0 +1,7 @@
+HOW TO IMPLEMENT METHODS
+
+Every new implementation in record_mgr.c should be tested on test_simple.
+
+That's how we keep track of every step and we make sure that the basic features
+are working fine.
+
