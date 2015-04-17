@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "record_mgr.h"
+#include "rm_serializer.c"
 
 // table and manager
 RC initRecordManager (void *mgmtData) {
@@ -135,10 +136,61 @@ RC createRecord (Record **record, Schema *schema) {
 }
 
 RC freeRecord (Record *record) {
+  free(record->id);
+  free(record->data);
+  free(record);
   return RC_OK;
 }
 
 RC getAttr (Record *record, Schema *schema, int attrNum, Value **value) {
+  Value *val;
+  
+  int offset;
+  char *attrData;
+  
+  attrOffset(schema, attrNum, &offset); //get the offset of attrNum in record->data
+  attrData = record->data + offset;     
+  
+  switch((schema->dataTypes)[attrNum])
+  {
+	case DT_INT: 
+	{
+		int intVal;
+		memcpy(&intVal,attrData, sizeof(int));
+		MAKE_VALUE(val, DT_INT, intVal);
+	}
+	break;
+	case DT_STRING:
+	{
+		char *buf;
+		int len = schema->typeLength[attrNum];
+		buf = (char *) malloc(len);
+		strncpy(buf, attrData, len);
+		MAKE_STRING_VALUE(val, buf);
+		(val->v.stringV)[len] = '\0';
+		free(buf);
+    }
+	break;
+	case DT_FLOAT:
+    {
+		float floatVal;
+		memcpy(&floatVal,attrData, sizeof(float));
+		MAKE_VALUE(val, DT_FLOAT, floatVal);
+    }
+    break;
+	case DT_BOOL:
+    {
+		bool boolVal;
+		memcpy(&boolVal,attrData, sizeof(bool));
+		MAKE_VALUE(val, DT_BOOL, boolVal);
+    }
+    break;
+    default: 
+	break;
+  }
+  
+  *value = val;
+  
   return RC_OK;
 }
 

@@ -64,7 +64,53 @@ void testCreateRecord(Schema *schema) {
 
 }
 
-void main() {
+void testGetAttr(Schema *schema){
+  Record *record;
+  createRecord(&record, schema);
+  
+  //not sure how to initialize this data, need to figure out!!!!!!!
+  record->data = "0123456789WilfridoVidana78.5true";
+
+  int i;
+  for(i=0; i<schema->numAttr; i++)
+  {
+	Value *value;
+	printf("The %ith attribute in the record is:\n",i);
+	getAttr(record, schema, i, &value);
+	
+	switch(schema->dataTypes[i])
+    {
+    case DT_INT: 
+	{
+		printf(value->v.intV);
+		free(value);
+	}
+    break;
+    case DT_STRING:
+	{
+		printf(&(value->v.stringV)); //??????
+		free(value->v.stringV);
+		free(value);
+	}
+    break;
+    case DT_FLOAT:
+	{
+		printf(value->v.floatV);
+		free(value);
+	}
+    break;
+    case DT_BOOL:
+	{
+		printf(value->v.floatV);
+		free(value);
+	}
+    break;
+    default: break;
+    }
+  }
+}
+
+int main() {
   printf("\nTesting createSchema...\n");
   Schema *schema;
   schema = testCreateSchema();
@@ -75,5 +121,9 @@ void main() {
 
   printf("\nTesting createRecord\n");
   testCreateRecord(schema);
-
+  
+  printf("\nTesting getAttr\n");
+  testGetAttr(schema);
+  
+  return 0;
 }
