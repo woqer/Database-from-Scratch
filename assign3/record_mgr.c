@@ -120,6 +120,17 @@ RC freeSchema (Schema *schema) {
 
 // dealing with records and attribute values
 RC createRecord (Record **record, Schema *schema) {
+  Record *rec = (Record *)malloc(sizeof(Record));
+  
+  RID *rid_ptr = (RID *)malloc(sizeof(RID));
+  rid_ptr->page = 0;
+  rid_ptr->slot = 0;
+  
+  rec->id = *rid_ptr;
+  rec->data = (char *)malloc(sizeof(char) * getRecordSize(schema));
+
+  *record = rec;
+
   return RC_OK;
 }
 
