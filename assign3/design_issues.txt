@@ -1,0 +1,1 @@
+Attribute size (name of the column) will be fixed by 32

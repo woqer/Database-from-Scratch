@@ -3,6 +3,8 @@
 
 #include "dt.h"
 
+#define ATTR_SIZE 32
+
 // Data Types, Records, and Schemas
 typedef enum DataType {
   DT_INT = 0,
