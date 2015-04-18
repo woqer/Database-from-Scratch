@@ -195,6 +195,27 @@ RC getAttr (Record *record, Schema *schema, int attrNum, Value **value) {
 }
 
 RC setAttr (Record *record, Schema *schema, int attrNum, Value *value) {
+
+  int offset;
+  char *attrData;
+  
+  attrOffset(schema, attrNum, &offset); //get the offset of attrNum in record->data
+  attrData = record->data + offset; 
+  
+  switch((schema->dataTypes)[attrNum])
+  {
+	case DT_INT: memcpy(attrData, &(value->v.intV), sizeof(int));
+	break;
+	case DT_STRING: memcpy(attrData, value->v.stringV, schema->typeLength[attrNum]);
+	break;
+	case DT_FLOAT: memcpy(attrData, &(value->v.floatV), sizeof(float));
+    break;
+	case DT_BOOL: memcpy(attrData, &(value->v.boolV), sizeof(bool));
+    break;
+    default: 
+	break;
+  }
+  
   return RC_OK;
 }
 

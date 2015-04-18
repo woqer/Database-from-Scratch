@@ -64,13 +64,36 @@ void testCreateRecord(Schema *schema) {
 
 }
 
+Record *testSetAttr(Schema, *schema)
+{
+	Record *record;
+	createRecord(&record, schema);
+	
+	Value *val_0, *val_1, *val_2, *val_3, *val_4;
+	
+	char *buff_1, *buff_2;
+	buff_1 = "An";
+	buff_2 = "Shi";
+	
+	MAKE_VALUE(val_0, DT_INT, 1021);
+	MAKE_STRING_VALUE(val_1, buff_1);
+	MAKE_STRING_VALUE(val_2, buff_2);
+	MAKE_VALUE(val_3, DT_FLOAT, 88.55);
+	MAKE_VALUE(val_4, DT_BOOL, 1);
+	
+	setAttr(record, schema, 0, val_0);
+	setAttr(record, schema, 1, val_1);
+	setAttr(record, schema, 2, val_2);
+	setAttr(record, schema, 3, val_3);
+	setAttr(record, schema, 4, val_4);
+	
+	return record;
+}
+
 void testGetAttr(Schema *schema){
   Record *record;
-  createRecord(&record, schema);
+  record = testSetAttr(schema);  
   
-  //not sure how to initialize this data, need to figure out!!!!!!!
-  record->data = "0123456789WilfridoVidana78.5true";
-
   int i;
   for(i=0; i<schema->numAttr; i++)
   {
@@ -82,26 +105,26 @@ void testGetAttr(Schema *schema){
     {
     case DT_INT: 
 	{
-		printf(value->v.intV);
+		printf("%d\n",value->v.intV);
 		free(value);
 	}
     break;
     case DT_STRING:
 	{
-		printf(&(value->v.stringV)); //??????
+		printf("%s\n", value->v.stringV);
 		free(value->v.stringV);
 		free(value);
 	}
     break;
     case DT_FLOAT:
 	{
-		printf(value->v.floatV);
+		printf("%f\n",value->v.floatV);
 		free(value);
 	}
     break;
     case DT_BOOL:
 	{
-		printf(value->v.floatV);
+		printf(value->v.floatV ? "true" : "false");
 		free(value);
 	}
     break;
@@ -122,7 +145,7 @@ int main() {
   printf("\nTesting createRecord\n");
   testCreateRecord(schema);
   
-  printf("\nTesting getAttr\n");
+  printf("\nTesting getAttr, setAttr is also tested\n");
   testGetAttr(schema);
   
   return 0;
