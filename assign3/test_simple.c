@@ -144,6 +144,10 @@ void testInitRecordManager() {
   initRecordManager(NULL);
 }
 
+void testShutDownRecordManager() {
+  shutdownRecordManager();
+}
+
 int main() {
   printf("\nTesting createSchema...\n");
   Schema *schema;
@@ -163,8 +167,10 @@ int main() {
   // printf("\nTesting freeAtttr\n");
   // testFreeRecord(schema);
 
-  printf("\nTestind initRecordManager\n");
+  printf("\nTesting initRecordManager\n");
   testInitRecordManager();
   
+  printf("\nTesting shutDownRecordManager\n");
+  testShutDownRecordManager();
   return 0;
 }
