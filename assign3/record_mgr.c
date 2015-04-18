@@ -2,8 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "record_mgr.h"
 #include "rm_serializer.c"
+
+// prototypes from rm_serializer.c
+static RC attrOffset (Schema *schema, int attrNum, int *result);
 
 // table and manager
 RC initRecordManager (void *mgmtData) {
@@ -136,7 +138,7 @@ RC createRecord (Record **record, Schema *schema) {
 }
 
 RC freeRecord (Record *record) {
-  free(record->id);
+  free(&(record->id));
   free(record->data);
   free(record);
   return RC_OK;

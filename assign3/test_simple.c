@@ -64,7 +64,7 @@ void testCreateRecord(Schema *schema) {
 
 }
 
-Record *testSetAttr(Schema, *schema)
+Record *testSetAttr(Schema *schema)
 {
 	Record *record;
 	createRecord(&record, schema);
@@ -125,6 +125,7 @@ void testGetAttr(Schema *schema){
     case DT_BOOL:
 	{
 		printf(value->v.floatV ? "true" : "false");
+    printf("\n");
 		free(value);
 	}
     break;

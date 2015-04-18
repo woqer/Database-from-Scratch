@@ -1,30 +1,32 @@
-all:
+all: simple expr main
+
+main:
 	gcc \
 	dberror.c \
 	storage_mgr.c \
 	buffer_mgr.c \
 	buffer_mgr_stat.c \
 	expr.c \
-	rm_serializer.c \
 	record_mgr.c \
 	test_assign3_1.c -o test_assign3_1
 
+
+expr:
 	gcc \
 	dberror.c \
 	expr.c \
-	rm_serializer.c \
 	record_mgr.c \
-	test_expr.c -o test_expr
+	test_expr.c -o test_expr	
 
+simple:
 	gcc \
 	dberror.c \
 	storage_mgr.c \
 	buffer_mgr.c \
 	buffer_mgr_stat.c \
-	expr.c \
-	rm_serializer.c \
 	record_mgr.c \
-	test_simple.c -o test_simple
+	expr.c \
+	test_simple.c -o test_simple	
 
 clean:
 	rm -f test_assign3_1
