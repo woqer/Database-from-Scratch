@@ -49,7 +49,7 @@ int testgetRecordSize(Schema *schema) {
   return size;
 }
 
-void testCreateRecord(Schema *schema) {
+Record *testCreateRecord(Schema *schema) {
   Record *record;
   createRecord(&record, schema);
 
@@ -57,11 +57,12 @@ void testCreateRecord(Schema *schema) {
   printf("record->id->slot:\t\t%i\n", (record->id).slot);
   printf("record->data:\t\t%s\n", record->data);
 
-  record->data = "1WilfridoVidana78.5true";
+  // record->data = "1WilfridoVidana78.5true";
 
-  printf("Data after writing something...\n");
-  printf("record->data:\t\t%s\n", record->data);
+  // printf("Data after writing something...\n");
+  // printf("record->data:\t\t%s\n", record->data);
 
+  return record;
 }
 
 Record *testSetAttr(Schema *schema)
@@ -124,14 +125,23 @@ void testGetAttr(Schema *schema){
     break;
     case DT_BOOL:
 	{
-		printf(value->v.floatV ? "true" : "false");
-    printf("\n");
+		printf("%s\n", value->v.floatV ? "true" : "false");
 		free(value);
 	}
     break;
     default: break;
     }
   }
+}
+
+void testFreeRecord(Schema *schema) {
+  Record *record;
+  createRecord(&record, schema);
+  freeRecord(record);
+}
+
+void testInitRecordManager() {
+  initRecordManager(NULL);
 }
 
 int main() {
@@ -144,10 +154,17 @@ int main() {
   size = testgetRecordSize(schema);
 
   printf("\nTesting createRecord\n");
-  testCreateRecord(schema);
+  Record *record;
+  record = testCreateRecord(schema);
   
   printf("\nTesting getAttr, setAttr is also tested\n");
   testGetAttr(schema);
+
+  // printf("\nTesting freeAtttr\n");
+  // testFreeRecord(schema);
+
+  printf("\nTestind initRecordManager\n");
+  testInitRecordManager();
   
   return 0;
 }

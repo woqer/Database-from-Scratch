@@ -4,6 +4,7 @@
 #include "dt.h"
 
 #define ATTR_SIZE 32
+#define MAX_N_TABLES 32
 
 // Data Types, Records, and Schemas
 typedef enum DataType {

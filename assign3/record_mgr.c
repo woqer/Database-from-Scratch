@@ -2,13 +2,66 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "buffer_mgr.h"
 #include "rm_serializer.c"
 
-// prototypes from rm_serializer.c
-static RC attrOffset (Schema *schema, int attrNum, int *result);
+typedef struct DB_header
+{
+  int numTables;
+  char **tableNames;
+  int *tableHeaders;
+} DB_header;
+
+static BM_BufferPool *buffer_manager;
+static BM_PageHandle *page_handler;
+
+DB_header *createDB_header() {
+  DB_header *header = (DB_header *)malloc(sizeof(DB_header));
+  header->tableHeaders = (int *)malloc(sizeof(int) * MAX_N_TABLES);
+  header->tableNames = (char **)malloc(sizeof(char*) * MAX_N_TABLES);
+  header->numTables = 0;
+  return header;
+}
+
+int readDB_Header(DB_header *header) {
+  return 0;
+}
+
+int writeDB_Header(DB_header *header, char *tableName) {
+  return 0;
+}
+
+int getDB_HeaderSize() {
+  int size = sizeof(int); // header->numTables 
+  size += sizeof(DB_header);
+  size += sizeof(int) * MAX_N_TABLES;
+  size += sizeof(char*) * MAX_N_TABLES;
+  return size;
+}
+
+void addTableToDB_Header (DB_header *header, RM_TableData *rel) {
+  // header->tableHeaders[numTables] = 
+}
 
 // table and manager
 RC initRecordManager (void *mgmtData) {
+  buffer_manager = MAKE_POOL();
+  page_handler = MAKE_PAGE_HANDLE();
+
+  char *pageFileName = "testrecord.bin"; 
+  createPageFile(pageFileName);
+  initBufferPool(buffer_manager, pageFileName, 6, RS_FIFO, NULL);
+
+  DB_header *db_header = createDB_header();
+
+  pinPage(buffer_manager, page_handler, 0);
+  
+  if (page_handler->data == '\0') {
+    // write DB_header to page
+  } else {
+    // read DB_header from page, not needed?!?!?!
+  }
+
   return RC_OK;
 }
 
@@ -132,15 +185,18 @@ RC createRecord (Record **record, Schema *schema) {
   rec->id = *rid_ptr;
   rec->data = (char *)malloc(sizeof(char) * getRecordSize(schema));
 
-  *record = rec;
+  *record = rec;  
 
   return RC_OK;
 }
 
 RC freeRecord (Record *record) {
+
   free(&(record->id));
   free(record->data);
+  printf("Trying to free record struct...\n");
   free(record);
+
   return RC_OK;
 }
 
