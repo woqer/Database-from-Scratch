@@ -87,7 +87,9 @@ createPageFile (char *fileName)
 	FILE *fp;
 	size_t size_wrote;
 	int size_header;
-	char zero = '\0';
+  // char zero = '\0';
+	char *zero = (char *)malloc(sizeof(char) * PAGE_SIZE);
+  strncpy(zero, "\0", sizeof(char) * PAGE_SIZE);
 
 	if ((fp = fopen(fileName, "w")) == NULL) return RC_FILE_R_W_ERROR;
 	
@@ -98,10 +100,12 @@ createPageFile (char *fileName)
 	}
 
 	// We fill in with '\0' a single page
-	size_wrote = fwrite(&zero, sizeof(char), PAGE_SIZE, fp);
+	size_wrote = fwrite(zero, sizeof(char)*PAGE_SIZE, 1, fp);
 	// printf("CREATEPAGEFILE(fwrite): size_wrote %d\n", size_wrote);
 
-	if (size_wrote != PAGE_SIZE) {
+  free(zero);
+
+	if (size_wrote != 1) {
 		return RC_FILE_R_W_ERROR;
 	} else {
 		fclose(fp);
@@ -179,18 +183,25 @@ readBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 	fp = fopen(fHandle->fileName, "r");
 
 	buff = (char*)malloc(sizeof(char)*PAGE_SIZE);
+  int i;
+  // for (i = 0; i < PAGE_SIZE; i++) {
+  //   memcpy(buff + i, '\0', sizeof(char));
+  // }
 
 	if ( (totalNumPages = readHeader(fp)) < 1) return RC_FILE_R_W_ERROR;
 
 	//check if pageNum is valid
 	if ((pageNum >= totalNumPages) || (pageNum < 0)) return RC_READ_NON_EXISTING_PAGE;
 
-	int i;
 	for (i = 0; i < (pageNum +1); i++) {
 		fread(buff, sizeof(char)*PAGE_SIZE, 1, fp);
 	}
 
-	strncpy(memPage, buff, PAGE_SIZE);
+  memcpy(memPage, buff, PAGE_SIZE);
+	// strncpy(memPage, buff, PAGE_SIZE);
+
+  // printf("this is a zero: %d\n", '\0');
+  // printf("Just read: %d %d %d\n", memPage[0], memPage[1], memPage[2]);
 
 	fHandle->curPagePos = pageNum;
 
@@ -281,6 +292,7 @@ writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 	
 	//write memPage to the pageNum
 	if (fwrite(memPage, sizeof(char)*PAGE_SIZE, 1, fp) < 1) return RC_WRITE_FAILED;
+  // printf("WRITED TO DISK (page-%i): %s\n", pageNum, memPage);
 
 	fHandle->curPagePos = pageNum;
 

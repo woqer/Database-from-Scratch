@@ -238,6 +238,7 @@ RC forceFlushPool(BM_BufferPool *const bm) {
       // write page to disk
       SM_PageHandle memPage = pi->frames[i];
 
+      printf("Writing to disk page %i\n", pi->map[i]);
       rc_code = writeBlock(pi->map[i], pi->fh, memPage);
       NumWriteIO++;
       if (rc_code != RC_OK)
@@ -282,6 +283,7 @@ RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page,
     if (rc_code != RC_OK) return rc_code;
   }
 
+  printf("READING FROM DISK PAGE %i\n", pageNum);
   rc_code = readBlock(pageNum, fh, memPage);
   NumReadIO++;
 

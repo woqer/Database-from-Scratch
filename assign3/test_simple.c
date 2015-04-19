@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <unistd.h>
 #include "dberror.h"
 #include "expr.h"
 #include "record_mgr.h"
@@ -170,6 +171,12 @@ int main() {
   printf("\nTesting initRecordManager\n");
   testInitRecordManager();
   
+  // printf("\nTESTING READING PAGE 1\n");
+  // testReadingPage();
+
+  // printf("\nTESTING WRITING PAGE 1\n");
+  // testWritingPage();
+
   printf("\nTesting shutDownRecordManager\n");
   testShutDownRecordManager();
   return 0;
