@@ -596,7 +596,7 @@ RC insertRecord (RM_TableData *rel, Record *record) {
 
   //page handler for the page to be written, it will always be the last page of the table
   BM_PageHandle *page_handler_writing_page = MAKE_PAGE_HANDLE(); 
-  CHECK(pinPage(buffer_manager, page_handler_writing_page, th_header->pagesList[numPages-1]));
+  CHECK(pinPage(buffer_manager, page_handler_writing_page, th_header->pagesList[th_header->numPages-1]));
 
   int recordSize = getRecordSize(th_header->schema);
   int offset = recordSize * th_header->nextSlot;
@@ -700,7 +700,9 @@ RC getRecord (RM_TableData *rel, RID id, Record *record) {
   Table_Header *th_header = read_table_serializer(page_handler_table->data); //Table_Header strudture for the data in table header
 
   //check if the slot is available for updating
+  int max_active_index = (th_header->numPages-1) * (th_header->slots_per_page) + th_header->nextSlot;
   int active_index = (id.page) * (th_header->slots_per_page) + id.slot;
+  if((active_index < 0) || (active_index >= max_active_index)) return RC_RECORD_OUT_OF_RANGE;
   if(!th_header->active[active_index]) return RC_RECORD_NOT_ACTIVE;
 
   //page handler for the page to be written, it will always be the last page of the table
@@ -729,18 +731,84 @@ RC getRecord (RM_TableData *rel, RID id, Record *record) {
   return RC_OK;
 }
 
+typedef struct Scan_Helper
+{
+  int nextRecord;
+  Table_Header *th_header;
+  Expr *cond;
+} Scan_Helper;
 
 // scans
 RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond) {
+  scan->rel = rel;
+
+  Scan_Helper *sp = (Scan_Helper *)malloc(sizeof(Scan_Helper *));
+  sp->nextRecord = 0;
+  sp->cond = cond; // ?? or make a copy of cond ??
+
+  char *tableName = rel->name; //name of the table
+
+  CHECK(pinPage(buffer_manager, page_handler_db, 0)); //page handler for database header
+  DB_header *db_header = read_db_serializer(page_handler_db->data); //DB_hearder structure for the data in database header
+
+  //index of the table in the array
+  int table_pos_in_array = searchStringArray(tableName, db_header->tableNames, db_header->numTables);
+  if(table_pos_in_array < 0) return RC_TABLE_NOT_FOUND;
+
+  int table_page_num = db_header->tableHeaders[table_pos_in_array];
+  
+  BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE(); //page handler for the table header
+  CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
+  Table_Header *th_header = read_table_serializer(page_handler_table->data); //Table_Header strudture for the data in table header
+
+  scan->th_header = th_header;
+  
+  scan->mgmtData = sp;
+
+  free_db_header(db_header);
+  //unpin all the pages
+  CHECK(unpinPage(buffer_manager, page_handler_table));
+  CHECK(unpinPage(buffer_manager, page_handler_db));
 
   return RC_OK;
 }
 
 RC next (RM_ScanHandle *scan, Record *record) {
-  return RC_OK;
+  RID *id = (RID *)malloc(sizeof(RID *));
+  RC returnCode;
+  Record *currentRecord = (Record *)malloc(sizeof(Record *));
+  Value *result = (Value *)malloc(sizeof(Value *));
+
+  //initialize id value
+  id->page = (int)(scan->mgmtData->nextRecord / scan->mgmtData->th_header->slots_per_page);
+  id->slot = scan->mgmtData->nextRecord % scan->mgmtData->th_header->slots_per_page;
+
+  while((returnCode = getRecord(scan->rel, *id, currentRecord)) != RC_RECORD_OUT_OF_RANGE)
+  {
+    if(returnCode == RC_RECORD_NOT_ACTIVE) continue;
+    
+    evalExpr(currentRecord, scan->rel->schema, scan->mgmtData->cond, &result);
+    
+    if(result->boolVal) {
+      record = currentRecord; //?? or make a copy of current record??
+      scan->mgmtData->nextRecord++;
+      return RC_OK;
+    } else {
+      scan->mgmtData->nextRecord++; // update nextRecord value
+      
+      //update id value, and search again
+      id->page = (int)(scan->mgmtData->nextRecord / scan->mgmtData->th_header->slots_per_page);
+      id->slot = scan->mgmtData->nextRecord % scan->mgmtData->th_header->slots_per_page;
+    }
+  }
+
+  return RC_RM_NO_MORE_TUPLES;
 }
 
 RC closeScan (RM_ScanHandle *scan) {
+  free(scan->mgmtData->nextRecord);
+  free_table_header(scan->mgmtData->th_header);
+  free(scan->mgmtData);
   return RC_OK;
 }
 
