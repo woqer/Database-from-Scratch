@@ -1,7 +1,13 @@
+DEBUG ?= 1
+	OPT = ""
+ifneq (DEBUG, 1)
+	OPT = -g
+endif
+
 all: simple expr main
 
 main:
-	gcc \
+	gcc $(OPT) \
 	dberror.c \
 	storage_mgr.c \
 	buffer_mgr.c \
@@ -11,13 +17,13 @@ main:
 	test_assign3_1.c -o test_assign3_1
 
 test1_basic:
-	gcc dberror.c storage_mgr.c test_assign1_1.c -o test_assign1_1
+	gcc $(OPT) dberror.c storage_mgr.c test_assign1_1.c -o test_assign1_1
 
 test1: test1_basic
-	gcc dberror.c storage_mgr.c test_assign1_extra.c -o test_assign1_extra
+	gcc $(OPT) dberror.c storage_mgr.c test_assign1_extra.c -o test_assign1_extra
 
 test2_basic:
-	gcc \
+	gcc $(OPT) \
 	dberror.c \
 	buffer_mgr.c \
 	buffer_mgr_stat.c \
@@ -25,7 +31,7 @@ test2_basic:
 	test_assign2_simple.c -o test_assign2_simple
 
 test2: test2_basic
-	gcc \
+	gcc $(OPT) \
 	dberror.c \
 	buffer_mgr.c \
 	buffer_mgr_stat.c \
@@ -34,14 +40,14 @@ test2: test2_basic
 
 
 expr:
-	gcc \
+	gcc $(OPT) \
 	dberror.c \
 	expr.c \
 	record_mgr.c \
 	test_expr.c -o test_expr	
 
 simple:
-	gcc \
+	gcc $(OPT) \
 	dberror.c \
 	storage_mgr.c \
 	buffer_mgr.c \

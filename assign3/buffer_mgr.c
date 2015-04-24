@@ -174,22 +174,22 @@ void free_pool(BM_BufferPool *bm) {
 
   int i;
   for (i = 0; i < bm->numPages; i++) {
-    // printf("free(pi->frames[%d])\n", i);
+    printf("free(pi->frames[%d])\n", i);
     free(pi->frames[i]);
   }
-  // printf("free(pi->frames)\n");
+  printf("free(pi->frames)\n");
   free(pi->frames);
-  // printf("free(pi->map)\n");
+  printf("free(pi->map)\n");
   free(pi->map);
-  // printf("free(pi->fixCounter)\n");
+  printf("free(pi->fixCounter)\n");
   free(pi->fixCounter);
-  // printf("free(pi->dirtys)\n");
+  printf("free(pi->dirtys)\n");
   free(pi->dirtys);
 
-  // printf("free(fh)\n");
+  printf("free(fh)\n");
   free(fh);
 
-  // printf("free(pi)\n");
+  printf("free(pi)\n");
   free(pi);
 
 }
@@ -428,6 +428,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
   RC rc_code = RC_OK;
 
   page->pageNum = pageNum;
+
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
 
   int index = searchArray(pageNum, pi->map, bm->numPages);

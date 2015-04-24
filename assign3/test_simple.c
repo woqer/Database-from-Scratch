@@ -177,6 +177,9 @@ int main() {
   // printf("\nTESTING WRITING PAGE 1\n");
   // testWritingPage();
 
+  printf("\nTesting createTable\n");
+  createTable("stupid_table", schema);
+
   printf("\nTesting shutDownRecordManager\n");
   testShutDownRecordManager();
   return 0;

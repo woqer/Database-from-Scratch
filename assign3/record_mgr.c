@@ -60,7 +60,7 @@ Table_Header *createTable_Header(Schema *schema) {
   th->pagesList = (int *)malloc(sizeof(int) * PAGES_LIST);
   th->schema = schema;
   th->nextSlot = 0;
-  th->numPages = 1;
+  th->numPages = 0;
   float slots_per_page_decimal = PAGE_SIZE / getRecordSize(schema);
   th->slots_per_page = (int)slots_per_page_decimal;
   th->active = (bool *)malloc(sizeof(bool) * th->slots_per_page);
@@ -192,12 +192,6 @@ void printSchema(Schema *schema) {
 }
 
 void printTable_Header(Table_Header *th) {
-  // int numPages;
-  // Schema *schema;
-  // int *pagesList;
-  // int nextSlot;
-  // int slots_per_page;
-  // bool *active; // size is numPages*slots_per_page
   printf("******************************\n");
   printf("Printing Table_Header...!!!\n");
   printf("numPages\t\t%d\n", th->numPages);
@@ -294,6 +288,8 @@ char *write_table_serializer(Table_Header *th) {
   for (i = 0; i < active_size; i++) {
     memcpy(out + offset, &(th->active[i]), bool_size);
     offset += bool_size;
+    if (th->active[i])
+      printf("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW_table_serializer: memcpy a value of true on position %i\n", i);
   }
 
   char *sch_data = write_schema_serializer(th->schema);
@@ -341,13 +337,14 @@ Schema *read_schema_serializer(char *data) {
   memcpy(&(schema->keySize), data + offset, int_size);
   offset += int_size;
 
-  schema->attrNames = (char **)malloc(sizeof(char *) * schema->numAttr);
+  schema->attrNames = (char **)malloc(sizeof(char *) * schema->numAttr);  
   schema->dataTypes = (DataType *)malloc(sizeof(DataType) * schema->numAttr);
   schema->typeLength = (int *)malloc(sizeof(int) * schema->numAttr);
   schema->keyAttrs = (int *)malloc(sizeof(int) * schema->keySize);
 
   int i;
   for (i = 0; i < schema->numAttr; i++) {
+    schema->attrNames[i] = (char *)malloc(sizeof(char) * ATTR_SIZE);
     memcpy(schema->attrNames[i], data + offset, str_size);
     offset += str_size;
     memcpy(&(schema->dataTypes[i]), data + offset, dt_size);
@@ -357,7 +354,7 @@ Schema *read_schema_serializer(char *data) {
   }
 
   for (i = 0; i < schema->keySize; i++) {
-    memcpy(&(schema->keyAttrs), data + offset, int_size);
+    memcpy(&(schema->keyAttrs[i]), data + offset, int_size);
     offset += int_size;
   }
 
@@ -373,7 +370,6 @@ Table_Header *read_table_serializer(char *data) {
   int int_size = sizeof(int);
   int str_size = sizeof(int);
   int bool_size = sizeof(bool);
-  int active_size = th->numPages * th->slots_per_page;
 
   memcpy(&(th->numPages), data, int_size);
   int offset = int_size;
@@ -382,6 +378,7 @@ Table_Header *read_table_serializer(char *data) {
   memcpy(&(th->slots_per_page), data + offset, int_size);
   offset += int_size;
 
+  int active_size = th->numPages * th->slots_per_page;
   th->pagesList = (int *)malloc(sizeof(int) * th->numPages);
   th->active = (bool *)malloc(sizeof(bool) * active_size);
 
@@ -392,11 +389,18 @@ Table_Header *read_table_serializer(char *data) {
   }
 
   for(i = 0; i < active_size; i++) {
-    memcpy(&(th->active), data + offset, bool_size);
+    memcpy(&(th->active[i]), data + offset, bool_size);
     offset += bool_size;
+    if (th->active[i])
+      printf("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR_table_serializer: memcpy a value of true on position %i\n", i);
   }
 
-  th->schema = read_schema_serializer(data + offset);
+  Schema *schema_aux = read_schema_serializer(data + offset);
+
+  printf("r_table_serilizer: printing schema from r_schema_serializer\n");
+  printSchema(schema_aux);
+
+  th->schema = schema_aux;
 
   return th;
 }
@@ -418,7 +422,7 @@ void testReadingPage() {
 // table and manager
 RC initRecordManager (void *mgmtData) {
   buffer_manager = MAKE_POOL();
-  BM_PageHandle *page_handler_db = MAKE_PAGE_HANDLE();
+  page_handler_db = MAKE_PAGE_HANDLE();
 
   char *pageFileName = "testrecord.bin";
 
@@ -480,22 +484,27 @@ RC initRecordManager (void *mgmtData) {
 
   CHECK(unpinPage(buffer_manager, page_handler_db));
 
+  printf("InitRecord printing page_handler_db...\n");
+  printf("page_handler_db->pageNum\t\t%d\n", page_handler_db->pageNum);
+
   return RC_OK;
 }
 
 RC shutdownRecordManager () {
-  CHECK(pinPage(buffer_manager, page_handler_db, 0));
+  // CHECK(pinPage(buffer_manager, page_handler_db, 0));
 
-  printf("Reading DB_Header on buffer before shutdown...\n");
-  DB_header *db_read = read_db_serializer(page_handler_db->data);
-  printDB_Header(db_read);
+  // printf("Reading DB_Header on buffer before shutdown...\n");
+  // DB_header *db_read = read_db_serializer(page_handler_db->data);
+  // printDB_Header(db_read);
 
   // printf("Adding some table to DB_Header before shutdown...\n");
   // addTableToDB_Header(db_read);
   // printDB_Header(db_read);
   
-  CHECK(unpinPage(buffer_manager, page_handler_db));
+  // CHECK(unpinPage(buffer_manager, page_handler_db));
+  printf("Shuting down buffer pool...\n");
   CHECK(shutdownBufferPool(buffer_manager));
+  printf("Returned from shuting down buffer pool\n");
   return RC_OK;
 }
 
@@ -503,23 +512,43 @@ RC shutdownRecordManager () {
 // NOT READY!!!
 RC createTable (char *name, Schema *schema) {
   BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE();
+  BM_PageHandle *page_handler_empty = MAKE_PAGE_HANDLE();
+
   Table_Header *th = createTable_Header(schema);
 
   CHECK(pinPage(buffer_manager, page_handler_db, 0));  
   DB_header *db_header = read_db_serializer(page_handler_db->data);
 
+  printf("createTable: db_header pinned and serialized, using info for setting up table...\n");
+  printDB_Header(db_header);
   // nextAvailPage is for table header and the next one will be the first page
   // to write records on this table
-  CHECK(pinPage(buffer_manager, page_handler_table, db_header->nextAvailPage));
-  th->pagesList[th->numPages++] = db_header->nextAvailPage + 1;
-
-  add_table_to_header(db_header, db_header->nextAvailPage, name);
+  int table_page_num = db_header->nextAvailPage;
+  CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
+  th->pagesList[th->numPages++] = table_page_num + 1;
   
-  char *data = write_db_serializer(db_header);
-  memcpy(page_handler_db->data, data, getDB_HeaderSize());
-  markDirty(buffer_manager, page_handler_db);
+  // creating empty page for first records
+  CHECK(pinPage(buffer_manager, page_handler_empty, table_page_num + 1));
+  CHECK(unpinPage(buffer_manager, page_handler_empty));
 
-  // write table header to buffer
+  printf("createTable: pined and unpinned empty page, proceeding to add_table_to_header\n");
+  // two pages used, one for table header, other for first records on new table
+  db_header->nextAvailPage += 2;
+  add_table_to_header(db_header, table_page_num, name);
+
+  char *table_data = write_table_serializer(th);
+  memcpy(page_handler_table->data, table_data, getTable_Header_Size(th));
+  free(table_data);
+  markDirty(buffer_manager, page_handler_table);
+  unpinPage(buffer_manager, page_handler_table);
+
+  char *db_data = write_db_serializer(db_header);
+  memcpy(page_handler_db->data, db_data, getDB_HeaderSize());
+  free(db_data);
+  markDirty(buffer_manager, page_handler_db);
+  unpinPage(buffer_manager, page_handler_db);
+
+  printf("Returning from createTable\n");
 
   return RC_OK;
 }
