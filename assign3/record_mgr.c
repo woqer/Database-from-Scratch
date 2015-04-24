@@ -330,27 +330,54 @@ int getNumTuples (RM_TableData *rel) {
   return 0;
 }
 
+
 // handling records in a table
 RC insertRecord (RM_TableData *rel, Record *record) {
-  char *tableName = rel->name;
+  char *tableName = rel->name; //name of the table
 
-  CHECK(pinPage(buffer_manager, page_handler_db, 0));
-  DB_header *db_header = read_db_serializer(page_handler_db->data);
+  CHECK(pinPage(buffer_manager, page_handler_db, 0)); //page handler for database header
+  DB_header *db_header = read_db_serializer(page_handler_db->data); //DB_hearder structure for the data in database header
 
+  //index of the table in the array
   int table_pos_in_array = searchStringArray(tableName, db_header->tableNames, db_header->numTables);
-  if(table_pos_in_array < 0){
-    return RC_FILE_NOT_FOUND;
-  }
+  if(table_pos_in_array < 0) return RC_FILE_NOT_FOUND;
 
   int table_page_num = db_header->tableHeaders[table_pos_in_array];
   
-  BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE();
+  BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE(); //page handler for the table header
   CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
+  Table_Header *th_header = read_table_serializer(page_handler_table->data); //Table_Header strudture for the data in table header
 
-  Table_Header *th_header = read_th_serializer(page_handler_table->data);
-  
+  //page handler for the page to be written, it will always be the last page of the table
+  BM_PageHandle *page_handler_writing_page = MAKE_PAGE_HANDLE(); 
+  CHECK(pinPage(buffer_manager, page_handler_writing_page, th_header->pagesList[numPages-1]));
 
+  int recordSize = getRecordSize(th_header->schema);
+  int offset = recordSize * th_header->nextSlot;
+
+  char *insertOffset = page_handler_writing_page->data + offset;
+
+  memcpy(insertOffset, record->data, recordSize);
+
+  //makeDirty and unpin the writing page 
+  CHECK(markDirty(buffer_manager, page_handler_writing_page));
+  CHECK(unpinPage(buffer_manager, page_handler_writing_page));
+
+  //update the handler for this table and the database
+  add_record_to_header(th_header, db_header);
+
+  //update table header
+  char *table_header_data = write_table_serializer(th_header);
+  memcpy(page_handler_table->data, table_header_data, getTable_Header_Size(th_header));
+  CHECK(unpinPage(buffer_manager, page_handler_table));
+  CHECK(markDirty(buffer_manager, page_handler_table));
+
+  //update database header
+  char *db_header_data = write_db_serializer(db_header);
+  memcpy(page_handler_db->data, db_header_data, getDB_HeaderSize());
   CHECK(unpinPage(buffer_manager, page_handler_db));
+  CHECK(markDirty(buffer_manager, page_handler_db));
+
   return RC_OK;
 }
 
