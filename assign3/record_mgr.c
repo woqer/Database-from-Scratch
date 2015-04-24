@@ -802,7 +802,7 @@ RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond) {
   CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
   Table_Header *th_header = read_table_serializer(page_handler_table->data); //Table_Header strudture for the data in table header
 
-  scan->th_header = th_header;
+  sp->th_header = th_header;
   
   scan->mgmtData = sp;
 
@@ -819,27 +819,28 @@ RC next (RM_ScanHandle *scan, Record *record) {
   RC returnCode;
   Record *currentRecord = (Record *)malloc(sizeof(Record *));
   Value *result = (Value *)malloc(sizeof(Value *));
+  Scan_Helper *sp = (Scan_Helper *)(scan->mgmtData);
 
   //initialize id value
-  id->page = (int)(scan->mgmtData->nextRecord / scan->mgmtData->th_header->slots_per_page);
-  id->slot = scan->mgmtData->nextRecord % scan->mgmtData->th_header->slots_per_page;
+  id->page = (int)(sp->nextRecord / sp->th_header->slots_per_page);
+  id->slot = sp->nextRecord % sp->th_header->slots_per_page;
 
   while((returnCode = getRecord(scan->rel, *id, currentRecord)) != RC_RECORD_OUT_OF_RANGE)
   {
     if(returnCode == RC_RECORD_NOT_ACTIVE) continue;
     
-    evalExpr(currentRecord, scan->rel->schema, scan->mgmtData->cond, &result);
+    evalExpr(currentRecord, scan->rel->schema, sp->cond, &result);
     
-    if(result->boolVal) {
+    if(result->v.boolV) {
       record = currentRecord; //?? or make a copy of current record??
-      scan->mgmtData->nextRecord++;
+      sp->nextRecord++;
       return RC_OK;
     } else {
-      scan->mgmtData->nextRecord++; // update nextRecord value
+      sp->nextRecord++; // update nextRecord value
       
       //update id value, and search again
-      id->page = (int)(scan->mgmtData->nextRecord / scan->mgmtData->th_header->slots_per_page);
-      id->slot = scan->mgmtData->nextRecord % scan->mgmtData->th_header->slots_per_page;
+      id->page = (int)(sp->nextRecord / sp->th_header->slots_per_page);
+      id->slot = sp->nextRecord % sp->th_header->slots_per_page;
     }
   }
 
@@ -847,9 +848,10 @@ RC next (RM_ScanHandle *scan, Record *record) {
 }
 
 RC closeScan (RM_ScanHandle *scan) {
-  free(scan->mgmtData->nextRecord);
-  free_table_header(scan->mgmtData->th_header);
-  free(scan->mgmtData);
+  Scan_Helper *sp = (Scan_Helper *)(scan->mgmtData);
+  //free(sp->nextRecord);
+  free_table_header(sp->th_header);
+  free(sp);
   return RC_OK;
 }
 
