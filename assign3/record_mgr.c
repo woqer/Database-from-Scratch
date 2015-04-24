@@ -29,21 +29,7 @@ typedef struct Table_Header
 static BM_BufferPool *buffer_manager;
 static BM_PageHandle *page_handler_db;
 
-void free_db_header(DB_header *head) {
-  int i;
-  for (i = 0; i < head->numTables; i++) {
-    free(head->tableNames[i]);
-  }
-  free(head->tableNames);
-  free(head->tableHeaders);
-  free(head);
-}
 
-void free_table_header(Table_Header *th) {
-  free(th->pagesList);
-  free(th->active);
-  free(th);
-}
 
 /* A function to linearly search a target integer in an integer array.
  * The index of the target is returned if found, -1 if not found.
@@ -53,6 +39,18 @@ int searchIntArray(int x, int *a, int length) {
   int i;
   for (i = 0; i < length; i++) {
     if (a[i] == x) return i;
+  }
+  return -1;
+}
+
+// searchs string in the given array, returns the index
+int searchStringArray(char *target, char **strArray, int length)
+{
+  int i;
+  for(i=0; i<length; i++)
+  {
+    if(strcmp(strArray[i], target) == 0)
+      return i;
   }
   return -1;
 }
@@ -85,6 +83,22 @@ DB_header *createDB_header() {
   header->numTables = 0;
   header->nextAvailPage = 1;
   return header;
+}
+
+void free_db_header(DB_header *head) {
+  int i;
+  for (i = 0; i < head->numTables; i++) {
+    free(head->tableNames[i]);
+  }
+  free(head->tableNames);
+  free(head->tableHeaders);
+  free(head);
+}
+
+void free_table_header(Table_Header *th) {
+  free(th->pagesList);
+  free(th->active);
+  free(th);
 }
 
 void add_table_to_header(DB_header *header, int tablePage, char* tableName) {
@@ -274,14 +288,7 @@ DB_header *read_db_serializer(char *data) {
   return header;
 }
 
-// IMPLEMENTUING...
 Schema *read_schema_serializer(char *data) {
-  // int numAttr;
-  // int keySize;
-  // char **attrNames;
-  // DataType *dataTypes;
-  // int *typeLength;
-  // int *keyAttrs;
   Schema *schema = (Schema *)malloc(sizeof(Schema));
   schema->numAttr = 0;
   schema->keySize = 0;
@@ -318,14 +325,7 @@ Schema *read_schema_serializer(char *data) {
   return schema;
 }
 
-// NOT READY YET!!!!!!
 Table_Header *read_table_serializer(char *data) {
-  // int numPages;
-  // int nextSlot;
-  // int slots_per_page;
-  // int *pagesList;
-  // bool *active; // size is numPages*slots_per_page
-  // Schema *schema;
   Table_Header *th = (Table_Header *)malloc(sizeof(Table_Header));
   th->numPages = 0;
   th->nextSlot = 0;
@@ -458,17 +458,6 @@ RC shutdownRecordManager () {
   CHECK(unpinPage(buffer_manager, page_handler_db));
   CHECK(shutdownBufferPool(buffer_manager));
   return RC_OK;
-}
-
-int searchStringArray(char *target, char **strArray, int length)
-{
-  int i;
-  for(i=0; i<length; i++)
-  {
-    if(strcmp(strArray[i], target) == 0)
-      return i;
-  }
-  return -1;
 }
 
 RC createTable (char *name, Schema *schema) {
