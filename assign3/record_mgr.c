@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <math.h>
 
 #include "buffer_mgr.h"
 #include "rm_serializer.c"
@@ -24,11 +23,39 @@ typedef struct Table_Header
   int *pagesList;
   int nextSlot;
   int slots_per_page;
+  bool *active; // size is numPages*slots_per_page
 } Table_Header;
 
 static BM_BufferPool *buffer_manager;
 static BM_PageHandle *page_handler_db;
 
+void free_db_header(DB_header *head) {
+  int i;
+  for (i = 0; i < head->numTables; i++) {
+    free(head->tableNames[i]);
+  }
+  free(head->tableNames);
+  free(head->tableHeaders);
+  free(head);
+}
+
+void free_table_header(Table_Header *th) {
+  free(th->pagesList);
+  free(th->active);
+  free(th);
+}
+
+/* A function to linearly search a target integer in an integer array.
+ * The index of the target is returned if found, -1 if not found.
+ * The search start at index 0 and ends at index length-1.
+ */
+int searchIntArray(int x, int *a, int length) {
+  int i;
+  for (i = 0; i < length; i++) {
+    if (a[i] == x) return i;
+  }
+  return -1;
+}
 
 Table_Header *createTable_Header(Schema *schema) {
   Table_Header *th = (Table_Header *)malloc(sizeof(Table_Header));
@@ -38,6 +65,12 @@ Table_Header *createTable_Header(Schema *schema) {
   th->numPages = 1;
   float slots_per_page_decimal = PAGE_SIZE / getRecordSize(schema);
   th->slots_per_page = (int)slots_per_page_decimal;
+  th->active = (bool *)malloc(sizeof(bool) * th->slots_per_page);
+  
+  int i;
+  for (i = 0; i < th->slots_per_page; i++) {
+    th->active[i] = false;
+  }
   return th;
 }
 
@@ -61,7 +94,12 @@ void add_table_to_header(DB_header *header, int tablePage, char* tableName) {
   header->nextAvailPage = tablePage + 2;
 }
 
+// returns the current available slot
 void add_record_to_header(Table_Header *th, DB_header *db_header) {
+
+  int active_index = ((th->numPages -1) * th->slots_per_page) + th->nextSlot;
+  th->active[active_index] = true;
+
   if (th->nextSlot + 1 > th->slots_per_page) {
     // need a new page
     th->nextSlot = 0;
@@ -71,6 +109,7 @@ void add_record_to_header(Table_Header *th, DB_header *db_header) {
       th->pagesList = (int *)realloc(th->pagesList, sizeof(int) * th->numPages);
     }
 
+    th->active = (bool *)realloc(th->active, sizeof(bool) * th->slots_per_page);
     th->pagesList[th->numPages++] = db_header->nextAvailPage++;
 
   } else {
@@ -79,7 +118,7 @@ void add_record_to_header(Table_Header *th, DB_header *db_header) {
 }
 
 int getDB_HeaderSize() {
-  int size = sizeof(int) * 2; // numTables and nextAvailPage
+  int size = sizeof(int) * 2; // numTables & nextAvailPage
   size += sizeof(DB_header);
   size += sizeof(int) * MAX_N_TABLES;
   size += sizeof(char *) * MAX_N_TABLES;
@@ -87,29 +126,28 @@ int getDB_HeaderSize() {
   return size;
 }
 
-// NOT READY YET!!!!!!
-int getSchemaSize() {
-    int numAttr;
-  char **attrNames;
-  DataType *dataTypes;
-  int *typeLength;
-  int *keyAttrs;
-  int keySize;
-
-  int size = sizeof(int);
+int getSchemaSize(Schema *schema) {
+  int size = sizeof(int) * 2;                 // keySize & numAttr
+  size += ATTR_SIZE * schema->numAttr;        // **attrNames;
+  size += sizeof(DataType) * schema->numAttr; // *dataTypes
+  size += sizeof(int) * schema->numAttr;      // *typeLength size;
+  size += sizeof(int) * schema->keySize;      // int *keyAttrs;
 }
 
-// NOT READY YET!!!!!!
+
 int getTable_Header_Size(Table_Header *th) {
   int size = sizeof(int) * 3; // numpages & nextSlot & slots_per_page
-  size += sizeof(DB_header);
+  
+  // *pagesList
   size += sizeof(int) * PAGES_LIST;
   int i, realloc_times;
   realloc_times = (int)(th->numPages / PAGES_LIST);
   for (i = 0; i < realloc_times; i++) {
     size += sizeof(int) * PAGES_LIST;
   }
-  // schema size...
+  
+  size += getSchemaSize(th->schema); // *schema
+  size += sizeof(bool) * th->numPages * th->slots_per_page; // *active
   return size;
 }
 
@@ -147,9 +185,69 @@ char *write_db_serializer(DB_header *header) {
   return out;
 }
 
-// NOT READY YET!!!!!!
-char *write_table_serializer(Table_Header *header) {
-  return "";
+char *write_schema_serializer(Schema *schema) {
+  int size = getSchemaSize(schema);
+  char *out = (char *)malloc(sizeof(char) * size);
+
+  int int_size = sizeof(int);
+  int str_size = sizeof(char) * ATTR_SIZE;
+  int dt_size = sizeof(DataType);
+
+  memcpy(out, &(schema->numAttr), int_size);
+  int offset = int_size;
+  memcpy(out + offset, &(schema->keySize), int_size);
+  offset += int_size;
+
+  int i;
+  for(i = 0; i < schema->numAttr; i++) {
+    memcpy(out + offset, schema->attrNames[i], str_size);
+    offset += str_size;
+    memcpy(out + offset, &(schema->dataTypes[i]), dt_size);
+    offset += dt_size;
+    memcpy(out + offset, &(schema->typeLength[i]), int_size);
+    offset += int_size;
+  }
+
+  for(i = 0; i < schema->keySize; i++) {
+    memcpy(out + offset, &(schema->keyAttrs[i]), int_size);
+    offset += int_size;
+  }
+
+  return out;
+}
+
+char *write_table_serializer(Table_Header *th) {
+  int size = getTable_Header_Size(th);
+  char *out = (char *)malloc(sizeof(char) * size);
+
+  int int_size = sizeof(int);
+  int str_size = sizeof(int);
+  int bool_size = sizeof(bool);
+  int active_size = th->numPages * th->slots_per_page;
+
+  memcpy(out, &(th->numPages), int_size);
+  int offset = int_size;
+  memcpy(out + offset, &(th->nextSlot), int_size);
+  offset += int_size;
+  memcpy(out + offset, &(th->slots_per_page), int_size);
+  offset += int_size;
+
+  int i;
+  for (i = 0; i < th->numPages; i++) {
+      memcpy(out + offset, &(th->pagesList[i]), int_size);
+      offset += int_size;
+  }
+
+  for (i = 0; i < active_size; i++) {
+    memcpy(out + offset, &(th->active[i]), bool_size);
+    offset += bool_size;
+  }
+
+  char *sch_data = write_schema_serializer(th->schema);
+  memcpy(out + offset, sch_data, getSchemaSize(th->schema));
+  free(sch_data); //already copied
+
+  return out;
 }
 
 DB_header *read_db_serializer(char *data) {
@@ -176,9 +274,91 @@ DB_header *read_db_serializer(char *data) {
   return header;
 }
 
+// IMPLEMENTUING...
+Schema *read_schema_serializer(char *data) {
+  // int numAttr;
+  // int keySize;
+  // char **attrNames;
+  // DataType *dataTypes;
+  // int *typeLength;
+  // int *keyAttrs;
+  Schema *schema = (Schema *)malloc(sizeof(Schema));
+  schema->numAttr = 0;
+  schema->keySize = 0;
+
+  int int_size = sizeof(int);
+  int str_size = sizeof(char) * ATTR_SIZE;
+  int dt_size = sizeof(DataType);
+
+  memcpy(&(schema->numAttr), data, int_size);
+  int offset = int_size;
+  memcpy(&(schema->keySize), data + offset, int_size);
+  offset += int_size;
+
+  schema->attrNames = (char **)malloc(sizeof(char *) * schema->numAttr);
+  schema->dataTypes = (DataType *)malloc(sizeof(DataType) * schema->numAttr);
+  schema->typeLength = (int *)malloc(sizeof(int) * schema->numAttr);
+  schema->keyAttrs = (int *)malloc(sizeof(int) * schema->keySize);
+
+  int i;
+  for (i = 0; i < schema->numAttr; i++) {
+    memcpy(schema->attrNames[i], data + offset, str_size);
+    offset += str_size;
+    memcpy(&(schema->dataTypes[i]), data + offset, dt_size);
+    offset += dt_size;
+    memcpy(&(schema->typeLength[i]), data + offset, int_size);
+    offset += int_size;
+  }
+
+  for (i = 0; i < schema->keySize; i++) {
+    memcpy(&(schema->keyAttrs), data + offset, int_size);
+    offset += int_size;
+  }
+
+  return schema;
+}
+
 // NOT READY YET!!!!!!
 Table_Header *read_table_serializer(char *data) {
-  Table_Header *th;
+  // int numPages;
+  // int nextSlot;
+  // int slots_per_page;
+  // int *pagesList;
+  // bool *active; // size is numPages*slots_per_page
+  // Schema *schema;
+  Table_Header *th = (Table_Header *)malloc(sizeof(Table_Header));
+  th->numPages = 0;
+  th->nextSlot = 0;
+  th->slots_per_page = 0;
+
+  int int_size = sizeof(int);
+  int str_size = sizeof(int);
+  int bool_size = sizeof(bool);
+  int active_size = th->numPages * th->slots_per_page;
+
+  memcpy(&(th->numPages), data, int_size);
+  int offset = int_size;
+  memcpy(&(th->nextSlot), data + offset, int_size);
+  offset += int_size;
+  memcpy(&(th->slots_per_page), data + offset, int_size);
+  offset += int_size;
+
+  th->pagesList = (int *)malloc(sizeof(int) * th->numPages);
+  th->active = (bool *)malloc(sizeof(bool) * active_size);
+
+  int i;
+  for(i = 0; i < th->numPages; i++) {
+    memcpy(&(th->pagesList[i]), data + offset, int_size);
+    offset += int_size;
+  }
+
+  for(i = 0; i < active_size; i++) {
+    memcpy(&(th->active), data + offset, bool_size);
+    offset += bool_size;
+  }
+
+  th->schema = read_schema_serializer(data + offset);
+
   return th;
 }
 
