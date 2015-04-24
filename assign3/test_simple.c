@@ -149,6 +149,7 @@ void testShutDownRecordManager() {
   shutdownRecordManager();
 }
 
+
 int main() {
   printf("\nTesting createSchema...\n");
   Schema *schema;
@@ -169,7 +170,7 @@ int main() {
   // testFreeRecord(schema);
 
   printf("\nTesting initRecordManager\n");
-  testInitRecordManager();
+  //testInitRecordManager();
   
   // printf("\nTESTING READING PAGE 1\n");
   // testReadingPage();
@@ -181,6 +182,9 @@ int main() {
   createTable("stupid_table", schema);
 
   printf("\nTesting shutDownRecordManager\n");
-  testShutDownRecordManager();
+  //testShutDownRecordManager();
+
+  printf("\nTesting createTable_Header and free_table_header\n");
+
   return 0;
 }
