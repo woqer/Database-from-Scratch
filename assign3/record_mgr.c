@@ -166,7 +166,7 @@ int getTable_Header_Size(Table_Header *th) {
 }
 
 void printDB_Header(DB_header *header) {
-  printf("Printing structure...!!!\n");
+  printf("Printing DB_header...!!!\n");
   printf("\tnumTables:\t\t%i\n", header->numTables);
   printf("\tnextAvailPage:\t\t%i\n", header->nextAvailPage);
   int i;
@@ -174,6 +174,45 @@ void printDB_Header(DB_header *header) {
     printf("\ttableNames[%i]\t\t%s\n", i, header->tableNames[i]);
     printf("\ttableHeaders[%i]\t\t%i\n", i, header->tableHeaders[i]);
   }
+}
+
+void printSchema(Schema *schema) {
+  printf("Printing Schema...!!!\n");
+  printf("numAttr\t\t%d\n", schema->numAttr);
+  int i;
+  for (i = 0; i < schema->numAttr; i++) {
+    printf("attrNames[%i]\t\t%s\n", i, schema->attrNames[i]);
+    printf("dataTypes[%i]\t\t%d\n", i, schema->dataTypes[i]);
+    printf("typeLength[%i]\t\t%d\n", i, schema->typeLength[i]);
+  }
+  printf("keySize\t\t%i\n", schema->keySize);
+  for (i = 0; i < schema->keySize; i++) {
+    printf("keyAttrs[%i]\t\t%d\n", i, schema->keyAttrs[i]);
+  }
+}
+
+void printTable_Header(Table_Header *th) {
+  // int numPages;
+  // Schema *schema;
+  // int *pagesList;
+  // int nextSlot;
+  // int slots_per_page;
+  // bool *active; // size is numPages*slots_per_page
+  printf("******************************\n");
+  printf("Printing Table_Header...!!!\n");
+  printf("numPages\t\t%d\n", th->numPages);
+  printf("nextSlot\t\t%d\n", th->nextSlot);
+  printf("slots_per_page\t\t%d\n", th->slots_per_page);
+  int active_size = th->numPages * th->slots_per_page;
+  int i;
+  for (i = 0; i < th->numPages; i++) {
+    printf("pagesList[%i]\t\t%d\n", i, th->pagesList[i]);
+  }
+  for (i = 0; i < active_size; i++) {
+    printf("active[%i]\t\t%s\n", i, th->active[i] ? "true" : "false");
+  }
+  printSchema(th->schema);
+  printf("******************************\n");
 }
 
 char *write_db_serializer(DB_header *header) {
@@ -460,6 +499,8 @@ RC shutdownRecordManager () {
   return RC_OK;
 }
 
+
+// NOT READY!!!
 RC createTable (char *name, Schema *schema) {
   BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE();
   Table_Header *th = createTable_Header(schema);
