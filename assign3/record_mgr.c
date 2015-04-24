@@ -96,7 +96,7 @@ int getSchemaSize() {
   int *keyAttrs;
   int keySize;
 
-  int size = sizeof(int) * 
+  int size = sizeof(int);
 }
 
 // NOT READY YET!!!!!!
@@ -142,14 +142,14 @@ char *write_db_serializer(DB_header *header) {
     offset += int_size;
   }
 
-  memcpy(out + offset, header->nextAvailPage, int_size);
+  memcpy(out + offset, &(header->nextAvailPage), int_size);
 
   return out;
 }
 
 // NOT READY YET!!!!!!
 char *write_table_serializer(Table_Header *header) {
-  return ""
+  return "";
 }
 
 DB_header *read_db_serializer(char *data) {
@@ -180,11 +180,6 @@ DB_header *read_db_serializer(char *data) {
 Table_Header *read_table_serializer(char *data) {
   Table_Header *th;
   return th;
-}
-
-void addTableToDB_Header (DB_header *header) {
-  write_to_header(header, 456, "HolaMundo");
-  // header->numTables++;
 }
 
 void testWritingPage() {
