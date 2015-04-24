@@ -315,6 +315,29 @@ RC createTable (char *name, Schema *schema) {
 }
 
 RC openTable (RM_TableData *rel, char *name) {
+  if(sizeof(name) > ATTR_SIZE) return RC_TABLE_NAME_TOO_LONG;
+
+  CHECK(pinPage(buffer_manager, page_handler_db, 0)); //page handler for database header
+  DB_header *db_header = read_db_serializer(page_handler_db->data); //DB_hearder structure for the data in database header
+
+  //index of the table in the array
+  int table_pos_in_array = searchStringArray(name, db_header->tableNames, db_header->numTables);
+  if(table_pos_in_array < 0) return RC_TABLE_NOT_FOUND;
+
+  int table_page_num = db_header->tableHeaders[table_pos_in_array];
+  
+  BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE(); //page handler for the table header
+  CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
+  Table_Header *th_header = read_table_serializer(page_handler_table->data); //Table_Header strudture for the data in table header
+
+  rel->name = (char *)malloc(sizeof(char *) * ATTR_SIZE);
+  strcpy(rel->name, name);
+
+  Schema *schema = th_header->schema;
+  rel->schema = createSchema (schema->numAttr, schema->attrNames, schema->dataTypes, schema->typeLength, schema->keySize, schema->keyAttrs);
+
+  free_table_header(th_header);
+  free_db_header(db_header);
   return RC_OK;
 }
 
@@ -323,11 +346,65 @@ RC closeTable (RM_TableData *rel) {
 }
 
 RC deleteTable (char *name) {
+  if(sizeof(name) > ATTR_SIZE) return RC_TABLE_NAME_TOO_LONG;
+
+  CHECK(pinPage(buffer_manager, page_handler_db, 0)); //page handler for database header
+  DB_header *db_header = read_db_serializer(page_handler_db->data); //DB_hearder structure for the data in database header
+
+  //index of the table in the array
+  int table_pos_in_array = searchStringArray(name, db_header->tableNames, db_header->numTables);
+  if(table_pos_in_array < 0) return RC_TABLE_NOT_FOUND;
+
+  int i;
+  for(i=table_pos_in_array; i<db_header->numTables-1; i++)
+  {
+    db_header->tableNames[i] = db_header->tableNames[i+1];
+    db_header->tableHeaders[i] = db_header->tableHeaders[i+1];
+  }
+  db_header->numTables--;
+
+  char *db_header_data = write_db_serializer(db_header);
+  memcpy(page_handler_db->data, db_header_data, getDB_HeaderSize());
+  free(db_header_data);
+  free_db_header(db_header);
+  CHECK(unpinPage(buffer_manager, page_handler_db));
+  CHECK(markDirty(buffer_manager, page_handler_db));
+
   return RC_OK;
 }
 
 int getNumTuples (RM_TableData *rel) {
-  return 0;
+  char *tableName = rel->name; //name of the table
+
+  CHECK(pinPage(buffer_manager, page_handler_db, 0)); //page handler for database header
+  DB_header *db_header = read_db_serializer(page_handler_db->data); //DB_hearder structure for the data in database header
+
+  //index of the table in the array
+  int table_pos_in_array = searchStringArray(tableName, db_header->tableNames, db_header->numTables);
+  if(table_pos_in_array < 0) return RC_TABLE_NOT_FOUND;
+
+  int table_page_num = db_header->tableHeaders[table_pos_in_array];
+  
+  BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE(); //page handler for the table header
+  CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
+  Table_Header *th_header = read_table_serializer(page_handler_table->data); //Table_Header strudture for the data in table header
+
+  int i, numTuples = 0;
+  int totalRecordInDisk = (th_header->slots_per_page) * (th_header->numPages-1) + th_header->nextSlot;
+  for(i=0; i<totalRecordInDisk; i++)
+  {
+    if(th_header->active[i])
+      numTuples++;
+  }
+  
+  //free headers
+  free_table_header(th_header);
+  free_db_header(db_header);
+  //unpin all the pages
+  CHECK(unpinPage(buffer_manager, page_handler_table));
+  CHECK(unpinPage(buffer_manager, page_handler_db));
+
+  return numTuples;
 }
 
 
@@ -340,7 +417,7 @@ RC insertRecord (RM_TableData *rel, Record *record) {
 
   //index of the table in the array
   int table_pos_in_array = searchStringArray(tableName, db_header->tableNames, db_header->numTables);
-  if(table_pos_in_array < 0) return RC_FILE_NOT_FOUND;
+  if(table_pos_in_array < 0) return RC_TABLE_NOT_FOUND;
 
   int table_page_num = db_header->tableHeaders[table_pos_in_array];
   
@@ -369,12 +446,16 @@ RC insertRecord (RM_TableData *rel, Record *record) {
   //update table header
   char *table_header_data = write_table_serializer(th_header);
   memcpy(page_handler_table->data, table_header_data, getTable_Header_Size(th_header));
+  free(table_header_data);
+  free_table_header(th_header);
   CHECK(unpinPage(buffer_manager, page_handler_table));
   CHECK(markDirty(buffer_manager, page_handler_table));
 
   //update database header
   char *db_header_data = write_db_serializer(db_header);
   memcpy(page_handler_db->data, db_header_data, getDB_HeaderSize());
+  free(db_header_data);
+  free_db_header(db_header);
   CHECK(unpinPage(buffer_manager, page_handler_db));
   CHECK(markDirty(buffer_manager, page_handler_db));
 
@@ -386,16 +467,103 @@ RC deleteRecord (RM_TableData *rel, RID id) {
 }
 
 RC updateRecord (RM_TableData *rel, Record *record) {
+  char *tableName = rel->name; //name of the table
+
+  CHECK(pinPage(buffer_manager, page_handler_db, 0)); //page handler for database header
+  DB_header *db_header = read_db_serializer(page_handler_db->data); //DB_hearder structure for the data in database header
+
+  RID id = record->id;
+
+  //index of the table in the array
+  int table_pos_in_array = searchStringArray(tableName, db_header->tableNames, db_header->numTables);
+  if(table_pos_in_array < 0) return RC_TABLE_NOT_FOUND;
+
+  int table_page_num = db_header->tableHeaders[table_pos_in_array];
+  
+  BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE(); //page handler for the table header
+  CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
+  Table_Header *th_header = read_table_serializer(page_handler_table->data); //Table_Header strudture for the data in table header
+
+  //check if the slot is available for updating
+  int active_index = (id.page) * (th_header->slots_per_page) + id.slot;
+  if(!th_header->active[active_index]) return RC_RECORD_NOT_ACTIVE;
+
+  //page handler for the page to be written, it will always be the last page of the table
+  BM_PageHandle *page_handler_writing_page = MAKE_PAGE_HANDLE(); 
+  CHECK(pinPage(buffer_manager, page_handler_writing_page, th_header->pagesList[id.page]));
+
+  int recordSize = getRecordSize(th_header->schema);
+  int offset = (id.slot) * recordSize;
+
+  char *updateOffset = page_handler_writing_page->data + offset;
+
+  memcpy(updateOffset, record->data, recordSize);
+
+  //makeDirty and unpin the writing page 
+  CHECK(markDirty(buffer_manager, page_handler_writing_page));
+  CHECK(unpinPage(buffer_manager, page_handler_writing_page));
+
+  //free both headers
+  free_table_header(th_header);
+  free_db_header(db_header);
+
+  //unpin the two header pages
+  CHECK(unpinPage(buffer_manager, page_handler_table));
+  CHECK(unpinPage(buffer_manager, page_handler_db));
+
   return RC_OK;
 }
 
 RC getRecord (RM_TableData *rel, RID id, Record *record) {
+  char *tableName = rel->name; //name of the table
+
+  CHECK(pinPage(buffer_manager, page_handler_db, 0)); //page handler for database header
+  DB_header *db_header = read_db_serializer(page_handler_db->data); //DB_hearder structure for the data in database header
+
+  //index of the table in the array
+  int table_pos_in_array = searchStringArray(tableName, db_header->tableNames, db_header->numTables);
+  if(table_pos_in_array < 0) return RC_TABLE_NOT_FOUND;
+
+  int table_page_num = db_header->tableHeaders[table_pos_in_array];
+  
+  BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE(); //page handler for the table header
+  CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
+  Table_Header *th_header = read_table_serializer(page_handler_table->data); //Table_Header strudture for the data in table header
+
+  //check if the slot is available for updating
+  int active_index = (id.page) * (th_header->slots_per_page) + id.slot;
+  if(!th_header->active[active_index]) return RC_RECORD_NOT_ACTIVE;
+
+  //page handler for the page to be written, it will always be the last page of the table
+  BM_PageHandle *page_handler_reading_page = MAKE_PAGE_HANDLE(); 
+  CHECK(pinPage(buffer_manager, page_handler_reading_page, th_header->pagesList[id.page]));
+
+  int recordSize = getRecordSize(th_header->schema);
+  int offset = (id.slot) * recordSize;
+
+  char *readOffset = page_handler_reading_page->data + offset;
+ 
+  createRecord(&record, th_header->schema); //create the record
+  record->id.page = id.page;
+  record->id.slot = id.slot;
+  
+  memcpy(record->data, readOffset, recordSize);
+
+  //free headers
+  free_table_header(th_header);
+  free_db_header(db_header);
+  //unpin all the pages
+  CHECK(unpinPage(buffer_manager, page_handler_reading_page));
+  CHECK(unpinPage(buffer_manager, page_handler_table));
+  CHECK(unpinPage(buffer_manager, page_handler_db));
+
   return RC_OK;
 }
 
 
 // scans
 RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond) {
+
   return RC_OK;
 }
 

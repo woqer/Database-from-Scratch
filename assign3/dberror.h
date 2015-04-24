@@ -32,6 +32,10 @@ typedef int RC;
 #define RC_IM_N_TO_LAGE 302
 #define RC_IM_NO_MORE_ENTRIES 303
 
+#define RC_TABLE_NOT_FOUND 400
+#define RC_TABLE_NAME_TOO_LONG 401
+#define RC_RECORD_NOT_ACTIVE 402
+
 /* holder for error messages */
 extern char *RC_message;
 
