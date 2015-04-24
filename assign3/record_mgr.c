@@ -199,6 +199,17 @@ RC shutdownRecordManager () {
   return RC_OK;
 }
 
+int searchStringArray(char *target, char **strArray, int length)
+{
+  int i;
+  for(i=0; i<length; i++)
+  {
+    if(strcmp(strArray[i], target) == 0)
+      return i;
+  }
+  return -1;
+}
+
 RC createTable (char *name, Schema *schema) {
   return RC_OK;
 }
@@ -221,6 +232,25 @@ int getNumTuples (RM_TableData *rel) {
 
 // handling records in a table
 RC insertRecord (RM_TableData *rel, Record *record) {
+  char *tableName = rel->name;
+
+  CHECK(pinPage(buffer_manager, page_handler_db, 0));
+  DB_header *db_header = read_db_serializer(page_handler_db->data);
+
+  int table_pos_in_array = searchStringArray(tableName, db_header->tableNames, db_header->numTables);
+  if(table_pos_in_array < 0){
+    return RC_FILE_NOT_FOUND;
+  }
+
+  int table_page_num = db_header->tableHeaders[table_pos_in_array];
+  
+  BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE();
+  CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
+
+  Table_Header *th_header = read_th_serializer(page_handler_table->data);
+  
+
+  CHECK(unpinPage(buffer_manager, page_handler_db));
   return RC_OK;
 }
 
