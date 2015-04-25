@@ -206,8 +206,8 @@ int main() {
   printf("\n**********************Testing createTable******************\n");
   createTable("stupid_table", schema);
 
-  printf("\n***********************Testing openTable*********************\n");
-  RM_TableData *rel = testOpenTable();
+  // printf("\n***********************Testing openTable*********************\n");
+  // RM_TableData *rel = testOpenTable();
   /*printf("\nTesting shutDownRecordManager\n");
   testShutDownRecordManager();
 */
@@ -215,14 +215,19 @@ int main() {
   //printf("\n***********************Testing deleteTable*********************\n");
   //testDeleteTable();
 
-  printf("\n***********************Testing insertRecord*********************\n");
-  testInsertRecord(rel, record);
+  // printf("\n***********************Testing insertRecord*********************\n");
+  // testInsertRecord(rel, record);
 
-  printf("\n***********************Testing getRecord*********************\n");
-  testGetRecord(rel);
+  // printf("\n***********************Testing getRecord*********************\n");
+  // testGetRecord(rel);
 
   // printf("\nTesting createTable\n");
   // createTable("stupid_table", schema);
+
+  printf("\nTesting freeing record\n");
+  freeRecord(record);
+  printf("\nTesting freeing schema\n");
+  freeSchema(schema);
 
   printf("\nTesting shutDownRecordManager\n");
   shutdownRecordManager();
