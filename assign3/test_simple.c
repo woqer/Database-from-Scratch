@@ -101,6 +101,32 @@ Record *testSetAttr(Schema *schema)
 	return record;
 }
 
+Record *testAnotherSetAttr(Schema *schema)
+{
+  Record *record;
+  createRecord(&record, schema);
+  
+  Value *val_0, *val_1, *val_2, *val_3, *val_4;
+  
+  char *buff_1, *buff_2;
+  buff_1 = "Wilfrido";
+  buff_2 = "Sayegh";
+  
+  MAKE_VALUE(val_0, DT_INT, 6258);
+  MAKE_STRING_VALUE(val_1, buff_1);
+  MAKE_STRING_VALUE(val_2, buff_2);
+  MAKE_VALUE(val_3, DT_FLOAT, 33.21);
+  MAKE_VALUE(val_4, DT_BOOL, 0);
+  
+  setAttr(record, schema, 0, val_0);
+  setAttr(record, schema, 1, val_1);
+  setAttr(record, schema, 2, val_2);
+  setAttr(record, schema, 3, val_3);
+  setAttr(record, schema, 4, val_4);
+
+  return record;
+}
+
 Record *testGetAttr(Schema *schema){
   Record *record;
   record = testSetAttr(schema);  
@@ -185,11 +211,9 @@ void testInsertRecord(RM_TableData *rel, Record *record) {
   free(table_data);*/
 }
 
-void testGetRecord(RM_TableData *rel) {
-  RID id;
-  id.page = 0;
-  id.slot = 0;
+void testGetRecord(RM_TableData *rel, RID id) {
   Record *record;
+  createRecord(&record, rel->schema);
   RC r = getRecord(rel, id, record);
   printf("\nReturn code from getRecord is %d\n", r);
   printf("\nRID of the returned record is page: %d, slot: %d\n", record->id.page, record->id.slot);
@@ -197,6 +221,53 @@ void testGetRecord(RM_TableData *rel) {
   char *recordData = serializeRecord(record, rel->schema);
   printf("\nThe record now have the following data: \n%s\n", recordData);
   free(recordData);
+
+  printf("Test record not found\n");
+  id.page = 0;
+  id.slot = 2;
+  r = getRecord(rel, id, record);
+  printf("\nReturn code from getRecord is %d\n", r);
+}
+
+void testUpdateRecord(RM_TableData *rel, Record *anotherRecord) {
+  updateRecord(rel, anotherRecord);
+  RID id;
+  id.page = 0;
+  id.slot = 0;
+  //testGetRecord(rel, id);
+  // char *tableData = serializeTableContent(rel);
+  // printf("Table Content\n%s\n", tableData);
+  // free(tableData);
+}
+
+void testDeleteRecord(RM_TableData *rel)
+{
+  RID id;
+  id.page = 0;
+  id.slot = 1;
+  printf("\nReturn code from deleteRecord is %d\n",deleteRecord(rel, id));
+  testGetRecord(rel, id);
+
+}
+
+RM_ScanHandle *testStartScan(RM_TableData *rel) {
+  RM_ScanHandle *scan = (RM_ScanHandle *)malloc(sizeof(RM_ScanHandle *));
+  printf("\nRecord code from startScan is %d\n",startScan(rel, scan, NULL));
+  printf("\nName in scan is %s\n", scan->rel->name);
+  return scan;
+}
+
+void testNext(RM_ScanHandle *scan) {
+  Record *record;
+  createRecord(&record,scan->rel->schema);
+  //printf("\nRecord code from next is %d\n",next(scan, record));
+
+  while(next(scan, record) != RC_RM_NO_MORE_TUPLES) 
+  {
+    printf("\nGot record\n %s\n", serializeRecord(record, scan->rel->schema));
+  }
+
+  printf("\nRecord code from closeScan is %d\n",closeScan(scan));
 }
 
 
@@ -220,20 +291,34 @@ int main() {
   printf("\n**********************Testing createTable******************\n");
   createTable("stupid_table", schema);
 
-  // printf("\n***********************Testing openTable*********************\n");
-  // RM_TableData *rel = testOpenTable();
-  /*printf("\nTesting shutDownRecordManager\n");
-  testShutDownRecordManager();
-*/
+  printf("\n***********************Testing openTable*********************\n");
+  RM_TableData *rel = testOpenTable();
+
 
   //printf("\n***********************Testing deleteTable*********************\n");
   //testDeleteTable();
 
-  // printf("\n***********************Testing insertRecord*********************\n");
-  // testInsertRecord(rel, record);
+  printf("\n***********************Testing insertRecord*********************\n");
+  testInsertRecord(rel, record);
 
-  // printf("\n***********************Testing getRecord*********************\n");
-  // testGetRecord(rel);
+  printf("\n***********************Testing getRecord*********************\n");
+  RID id;
+  id.page = 0;
+  id.slot = 0;
+  testGetRecord(rel, id);
+
+  printf("\n***********************Testing updateRecord*********************\n");
+  Record *anotherRecord = testAnotherSetAttr(rel->schema);
+  testUpdateRecord(rel, anotherRecord);
+
+  // printf("\n***********************Testing deleteRecord*********************\n");
+  // testDeleteRecord(rel);
+
+  printf("\n***********************Testing startScan*********************\n");
+  RM_ScanHandle *scan = testStartScan(rel);
+
+  printf("\n***********************Testing next*********************\n");
+  testNext(scan);
 
   // printf("\nTesting createTable\n");
   // createTable("stupid_table", schema);
@@ -243,8 +328,11 @@ int main() {
   printf("\nTesting freeing schema\n");
   freeSchema(schema);
 
-  printf("\nTesting shutDownRecordManager\n");
-  shutdownRecordManager();
+  //printf("\n*********************Testing shutDownRecordManager**********************\n");
+  //testShutDownRecordManager();
+  
+  // printf("\nTesting shutDownRecordManager\n");
+  //shutdownRecordManager();
 
   // printf("\nTesting createTable_Header and free_table_header\n");
 

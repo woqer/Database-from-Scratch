@@ -825,11 +825,10 @@ RC getRecord (RM_TableData *rel, RID id, Record *record) {
   int offset = (id.slot) * recordSize;
 
   char *readOffset = page_handler_reading_page->data + offset;
- 
-  createRecord(&record, th_header->schema); //create the record
+
+  // createRecord(&record, rel->schema); //create the record
   record->id.page = id.page;
   record->id.slot = id.slot;
-  printf("\nRID of the returned record is page: %d, slot: %d\n", record->id.page, record->id.slot);
 
   memcpy(record->data, readOffset, recordSize);
 
@@ -842,9 +841,10 @@ RC getRecord (RM_TableData *rel, RID id, Record *record) {
   CHECK(unpinPage(buffer_manager, page_handler_db));
   
   //for testing, to print recond info
-  char *recordData = serializeRecord(record, rel->schema);
-  printf("\nThe record now have the following data: \n%s\n", recordData);
-  free(recordData);
+  // printf("\nRID of the returned record is page: %d, slot: %d\n", record->id.page, record->id.slot);
+  // char *recordData = serializeRecord(record, rel->schema);
+  // printf("\nThe record now have the following data: \n%s\n", recordData);
+  // free(recordData);
   
   return RC_OK;
 }
@@ -894,8 +894,8 @@ RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond) {
 RC next (RM_ScanHandle *scan, Record *record) {
   RID *id = (RID *)malloc(sizeof(RID *));
   RC returnCode;
-  Record *currentRecord = (Record *)malloc(sizeof(Record *));
-  Value *result = (Value *)malloc(sizeof(Value *));
+  
+  Value *result;
   Scan_Helper *sp = (Scan_Helper *)(scan->mgmtData);
 
   //initialize id value
@@ -903,18 +903,28 @@ RC next (RM_ScanHandle *scan, Record *record) {
   id->slot = sp->nextRecord % sp->th_header->slots_per_page;
 
   if(sp->cond == NULL)
-    MAKE_VALUE(result, DT_BOOL, true);
-  // printf("%s", result->v.boolV ? "true" : "false");
-  while((returnCode = getRecord(scan->rel, *id, currentRecord)) != RC_RECORD_OUT_OF_RANGE)
   {
-    if(returnCode == RC_RECORD_NOT_ACTIVE) continue;
+    MAKE_VALUE(result, DT_BOOL, true);
+  }
+  
+  while((returnCode = getRecord(scan->rel, *id, record)) != RC_RECORD_OUT_OF_RANGE)
+  {
+    if(returnCode == RC_RECORD_NOT_ACTIVE)
+    {
+      sp->nextRecord++; // update nextRecord value
+      
+      //update id value, and search again
+      id->page = (int)(sp->nextRecord / sp->th_header->slots_per_page);
+      id->slot = sp->nextRecord % sp->th_header->slots_per_page;
+      continue;
+    } 
     
     if(sp->cond != NULL)
-      evalExpr(currentRecord, scan->rel->schema, sp->cond, &result);
+      evalExpr(record, scan->rel->schema, sp->cond, &result);
     
     if(result->v.boolV) {
-      record = currentRecord; //?? or make a copy of current record??
       sp->nextRecord++;
+      
       return RC_OK;
     } else {
       sp->nextRecord++; // update nextRecord value
