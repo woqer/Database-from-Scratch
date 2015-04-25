@@ -682,6 +682,42 @@ RC insertRecord (RM_TableData *rel, Record *record) {
 }
 
 RC deleteRecord (RM_TableData *rel, RID id) {
+  char *tableName = rel->name;
+
+  CHECK(pinPage(buffer_manager, page_handler_db, 0)); 
+  DB_header *db_header = read_db_serializer(page_handler_db->data); 
+
+  RID id = record->id;
+  
+  int table_pos_in_array = searchStringArray(tableName, db_header->tableNames, db_header->numTables);
+  if(table_pos_in_array < 0) return RC_TABLE_NOT_FOUND;
+
+  int table_page_num = db_header->tableHeaders[table_pos_in_array];
+  
+  BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE(); 
+  CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
+  Table_Header *th_header = read_table_serializer(page_handler_table->data); 
+   
+  int active_index = (id.page) * (th_header->slots_per_page) + id.slot;
+  if(!th_header->active[active_index]) return RC_RECORD_NOT_ACTIVE;
+  
+  if(th_header->active[active_index]) {
+    th_header->active[active_index] = false;
+  } else {
+    return RC_RECORD_NOT_ACTIVE;
+  }
+  
+  char *t_header_data = write_db_serializer(th_header);  
+  memcpy(page_handler_table->data, table_header_data, getTable_Header_Size(th_header));
+  
+  
+  CHECK(markDirty(buffer_manager, page_handler_table));
+  
+  CHECK(unpinPage(buffer_manager, page_handler_table));
+
+  free(t_header_data);
+  
+
   return RC_OK;
 }
 
