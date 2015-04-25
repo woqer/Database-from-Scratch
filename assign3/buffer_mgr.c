@@ -107,7 +107,7 @@ int searchLowest(int *a, int length) {
 /* A function to initialize buffer meta data structure, which are kept in BM_PoolInfo.
  */
 RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
-  RC rc_code;
+  RC rc_code = RC_OK;
   pi->numPages = numPages;
   pi->fh = fh;
   pi->dirtys = (bool *)malloc(sizeof(bool) * numPages);

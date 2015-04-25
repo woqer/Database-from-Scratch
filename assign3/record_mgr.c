@@ -288,8 +288,8 @@ char *write_table_serializer(Table_Header *th) {
   for (i = 0; i < active_size; i++) {
     memcpy(out + offset, &(th->active[i]), bool_size);
     offset += bool_size;
-    if (th->active[i])
-      printf("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW_table_serializer: memcpy a value of true on position %i\n", i);
+    /*if (th->active[i])
+      printf("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW_table_serializer: memcpy a value of true on position %i\n", i);*/
   }
 
   char *sch_data = write_schema_serializer(th->schema);
@@ -391,15 +391,15 @@ Table_Header *read_table_serializer(char *data) {
   for(i = 0; i < active_size; i++) {
     memcpy(&(th->active[i]), data + offset, bool_size);
     offset += bool_size;
-    if (th->active[i])
+    /*if (th->active[i])
       printf("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR_table_serializer: memcpy a value of true on position %i\n", i);
-  }
+*/  }
 
   Schema *schema_aux = read_schema_serializer(data + offset);
 
-  printf("r_table_serilizer: printing schema from r_schema_serializer\n");
+/*  printf("r_table_serilizer: printing schema from r_schema_serializer\n");
   printSchema(schema_aux);
-
+*/
   th->schema = schema_aux;
 
   return th;
@@ -854,11 +854,15 @@ RC next (RM_ScanHandle *scan, Record *record) {
   id->page = (int)(sp->nextRecord / sp->th_header->slots_per_page);
   id->slot = sp->nextRecord % sp->th_header->slots_per_page;
 
+  if(sp->cond == NULL)
+    MAKE_VALUE(result, DT_BOOL, true);
+  printf("%s", result->v.boolV ? "true" : "false");
   while((returnCode = getRecord(scan->rel, *id, currentRecord)) != RC_RECORD_OUT_OF_RANGE)
   {
     if(returnCode == RC_RECORD_NOT_ACTIVE) continue;
     
-    evalExpr(currentRecord, scan->rel->schema, sp->cond, &result);
+    if(sp->cond != NULL)
+        evalExpr(currentRecord, scan->rel->schema, sp->cond, &result);
     
     if(result->v.boolV) {
       record = currentRecord; //?? or make a copy of current record??
