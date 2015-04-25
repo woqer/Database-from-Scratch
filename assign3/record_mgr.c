@@ -105,11 +105,10 @@ void free_table_header(Table_Header *th) {
 
 
 // returns the current available slot
-void add_record_to_header(Table_Header *th, DB_header *db_header) {
-
+RID add_record_to_header(Table_Header *th, DB_header *db_header) {
   int active_index = ((th->numPages -1) * th->slots_per_page) + th->nextSlot;
   th->active[active_index] = true;
-
+  
   if (th->nextSlot + 1 > th->slots_per_page) {
     // need a new page
     th->nextSlot = 0;
@@ -121,6 +120,7 @@ void add_record_to_header(Table_Header *th, DB_header *db_header) {
     }
 
     th->pagesList[th->numPages++] = db_header->nextAvailPage++;
+    
     printf("Reallocing th->active to length %d\n", th->slots_per_page * th->numPages);
     th->active = (bool *)realloc(th->active, sizeof(bool) * th->slots_per_page * th->numPages);
 
