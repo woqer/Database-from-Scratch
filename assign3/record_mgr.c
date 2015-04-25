@@ -30,7 +30,6 @@ static BM_BufferPool *buffer_manager;
 static BM_PageHandle *page_handler_db;
 
 
-
 /* A function to linearly search a target integer in an integer array.
  * The index of the target is returned if found, -1 if not found.
  * The search start at index 0 and ends at index length-1.
