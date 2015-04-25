@@ -143,7 +143,7 @@ RC initBufferPool(BM_BufferPool *const bm, const char *const pageFileName,
   RC rc_code;
 
   SM_FileHandle *fHandle = (SM_FileHandle *)malloc(sizeof(SM_FileHandle));
-  fHandle->fileName = (char *)malloc(sizeof(char)*256);
+  // fHandle->fileName = (char *)malloc(sizeof(char)*256);
 
 
   if ((rc_code = openPageFile(pageFileName, fHandle)) != RC_OK) return rc_code;
@@ -174,22 +174,28 @@ void free_pool(BM_BufferPool *bm) {
 
   int i;
   for (i = 0; i < bm->numPages; i++) {
-    printf("free(pi->frames[%d])\n", i);
+    // printf("Freeing %i pages...\n", bm->numPages);
+    // printf("free(pi->frames[%d])\n", i);
+    // printf("pi->frames[%i] info: %s\n", i,pi->frames[i]);
     free(pi->frames[i]);
   }
-  printf("free(pi->frames)\n");
+
+  // printf("free(pi->frames)\n");
   free(pi->frames);
-  printf("free(pi->map)\n");
+  // printf("free(pi->map)\n");
   free(pi->map);
-  printf("free(pi->fixCounter)\n");
+  // printf("free(pi->fixCounter)\n");
   free(pi->fixCounter);
-  printf("free(pi->dirtys)\n");
+  // printf("free(pi->dirtys)\n");
   free(pi->dirtys);
 
-  printf("free(fh)\n");
+  free(pi->lru_stamp);
+
+  // printf("free(fh->fileName) = %s\n", fh->fileName);
+  // free(fh->fileName);
   free(fh);
 
-  printf("free(pi)\n");
+  // printf("free(pi)\n");
   free(pi);
 
 }

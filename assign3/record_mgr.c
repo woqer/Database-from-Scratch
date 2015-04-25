@@ -87,7 +87,7 @@ DB_header *createDB_header() {
 
 void free_db_header(DB_header *head) {
   int i;
-  for (i = 0; i < head->numTables; i++) {
+  for (i = 0; i < MAX_N_TABLES; i++) {
     free(head->tableNames[i]);
   }
   free(head->tableNames);
@@ -210,8 +210,10 @@ void printTable_Header(Table_Header *th) {
 }
 
 char *write_db_serializer(DB_header *header) {
-  int size = getDB_HeaderSize();
-  char *out = (char *)malloc(sizeof(char) * size);
+  int size = NULL;
+  size = getDB_HeaderSize();
+  char *out = NULL;
+  out = (char *)malloc(sizeof(char) * size);
 
   int int_size = sizeof(int);
   int str_size = sizeof(char) * ATTR_SIZE;
@@ -288,8 +290,8 @@ char *write_table_serializer(Table_Header *th) {
   for (i = 0; i < active_size; i++) {
     memcpy(out + offset, &(th->active[i]), bool_size);
     offset += bool_size;
-    /*if (th->active[i])
-      printf("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW_table_serializer: memcpy a value of true on position %i\n", i);*/
+    if (th->active[i])
+      printf("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW_table_serializer: memcpy a value of true on position %i\n", i);
   }
 
   char *sch_data = write_schema_serializer(th->schema);
@@ -391,9 +393,9 @@ Table_Header *read_table_serializer(char *data) {
   for(i = 0; i < active_size; i++) {
     memcpy(&(th->active[i]), data + offset, bool_size);
     offset += bool_size;
-    /*if (th->active[i])
+    if (th->active[i])
       printf("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR_table_serializer: memcpy a value of true on position %i\n", i);
-*/  }
+  }
 
   Schema *schema_aux = read_schema_serializer(data + offset);
 
@@ -433,59 +435,36 @@ RC initRecordManager (void *mgmtData) {
   
   initBufferPool(buffer_manager, pageFileName, 6, RS_FIFO, NULL);
 
-  DB_header *db_header = createDB_header();
 
   CHECK(pinPage(buffer_manager, page_handler_db, 0));
   
   printf("Reading DB_header from disk...\n");
   DB_header *db_read = read_db_serializer(page_handler_db->data);
 
-  printDB_Header(db_read);
-
-
   if (db_read->numTables <= 0) {
-    // write DB_header to page
     printf("No DB_Header in disk, writing a new one...\n");
-    
-    // printDB_Header(db_header);
 
-    // printf("Adding some table to DB_Header before initializing...\n");
-    // addTableToDB_Header(db_header);
-    // printDB_Header(db_header);
-
+    DB_header *db_header = createDB_header();
     char *data = write_db_serializer(db_header);
 
     memcpy(page_handler_db->data, data, getDB_HeaderSize());
 
-    printf("Checking header serializers in init...\n");
-    DB_header *helper = read_db_serializer(page_handler_db->data);
-    printDB_Header(helper);
-
     CHECK(markDirty(buffer_manager, page_handler_db));
 
-  }
+    free(data);
+    free_db_header(db_header);
 
-  else {
-    // read DB_header from page, not needed?!?!?!
-    printf("************* GOOD ****************\n");
-    printf("************* GOOD ****************\n");
-    printf("************* GOOD ****************\n");
-    printf("Reading already existent DB_Header...\n");
-    DB_header *db_read = read_db_serializer(page_handler_db->data);
-
+  } else {
+    printf("****** Printing already existent DB_Header... ******\n");
     printDB_Header(db_read);
-
   }
-  
-  // char *data = write_db_serializer(db_header);
-  // memcpy(page_handler_db->data, data, getDB_HeaderSize());
-  
-  // markDirty(buffer_manager, page_handler_db);  
 
   CHECK(unpinPage(buffer_manager, page_handler_db));
 
   printf("InitRecord printing page_handler_db...\n");
   printf("page_handler_db->pageNum\t\t%d\n", page_handler_db->pageNum);
+
+  free_db_header(db_read);
 
   return RC_OK;
 }
@@ -505,11 +484,13 @@ RC shutdownRecordManager () {
   printf("Shuting down buffer pool...\n");
   CHECK(shutdownBufferPool(buffer_manager));
   printf("Returned from shuting down buffer pool\n");
+
+  free(page_handler_db);
+  free(buffer_manager);
+
   return RC_OK;
 }
 
-
-// NOT READY!!!
 RC createTable (char *name, Schema *schema) {
   BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE();
   BM_PageHandle *page_handler_empty = MAKE_PAGE_HANDLE();
@@ -645,7 +626,6 @@ int getNumTuples (RM_TableData *rel) {
 
   return numTuples;
 }
-
 
 // handling records in a table
 RC insertRecord (RM_TableData *rel, Record *record) {
@@ -938,33 +918,40 @@ Schema *createSchema (int numAttr, char **attrNames, DataType *dataTypes, int *t
 }
 
 RC freeSchema (Schema *schema) {
+  int i;
+  for(i = 0; i < schema->numAttr; i++) {
+    free(schema->attrNames[i]);
+  }
+  free(schema->attrNames);
+  free(schema->dataTypes);
+  free(schema->typeLength);
+  free(schema->keyAttrs);
+
+  free(schema);
+
   return RC_OK;
 }
 
 
 // dealing with records and attribute values
 RC createRecord (Record **record, Schema *schema) {
-  Record *rec = (Record *)malloc(sizeof(Record));
+  Record *rec = NULL;
+  rec = (Record *)malloc(sizeof(Record));
   
-  RID *rid_ptr = (RID *)malloc(sizeof(RID));
-  rid_ptr->page = 0;
-  rid_ptr->slot = 0;
+  rec->id.page = 0;
+  rec->id.slot = 0;
   
-  rec->id = *rid_ptr;
   rec->data = (char *)malloc(sizeof(char) * getRecordSize(schema));
 
-  *record = rec;  
+  *record = rec;
 
   return RC_OK;
 }
 
 RC freeRecord (Record *record) {
-
-  free(&(record->id));
   free(record->data);
-  printf("Trying to free record struct...\n");
   free(record);
-
+  
   return RC_OK;
 }
 

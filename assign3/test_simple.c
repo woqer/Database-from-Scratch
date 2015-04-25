@@ -137,19 +137,6 @@ Record *testGetAttr(Schema *schema){
   return record;
 }
 
-void testFreeRecord(Schema *schema) {
-  Record *record;
-  createRecord(&record, schema);
-  freeRecord(record);
-}
-
-void testInitRecordManager() {
-  initRecordManager(NULL);
-}
-
-void testShutDownRecordManager() {
-  shutdownRecordManager();
-}
 
 RM_TableData *testOpenTable() {
   RM_TableData *rel = (RM_TableData *)malloc(sizeof(RM_TableData *));
@@ -200,32 +187,21 @@ void testGetRecord(RM_TableData *rel) {
 
 
 int main() {
-  printf("\nTesting createSchema...\n");
-  Schema *schema;
-  schema = testCreateSchema();
-
-  printf("\nTesting getRecordSize\n");
-  int size;
-  size = testgetRecordSize(schema);
-
-  printf("\nTesting createRecord\n");
-  testCreateRecord(schema);
-  
-  printf("\nTesting getAttr, setAttr is also tested\n");
-  Record *record;
-  record = testGetAttr(schema);
-
-  // printf("\nTesting freeAtttr\n");
-  // testFreeRecord(schema);
-
   printf("\n************************Testing initRecordManager************************\n");
-  testInitRecordManager();
+  initRecordManager(NULL);
   
+
   // printf("\nTESTING READING PAGE 1\n");
   // testReadingPage();
 
   // printf("\nTESTING WRITING PAGE 1\n");
   // testWritingPage();
+
+  printf("\n Testing creating schema\n");
+  Schema *schema = testCreateSchema();
+
+  printf("\n Testing create record\n");
+  Record *record = testCreateRecord(schema);
 
   printf("\n**********************Testing createTable******************\n");
   createTable("stupid_table", schema);
@@ -245,7 +221,15 @@ int main() {
   printf("\n***********************Testing getRecord*********************\n");
   testGetRecord(rel);
 
-  printf("\nTesting createTable_Header and free_table_header\n");
+  // printf("\nTesting createTable\n");
+  // createTable("stupid_table", schema);
 
+  printf("\nTesting shutDownRecordManager\n");
+  shutdownRecordManager();
+
+  // printf("\nTesting createTable_Header and free_table_header\n");
+
+
+  printf("\n\n*************** TEST FINISHED ***********************\n\n");
   return 0;
 }
