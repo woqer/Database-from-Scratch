@@ -19,8 +19,8 @@ static int HEADER_SIZE = 6;
 int
 readHeader (FILE *fp)
 {
-  int head_size;
-  char *buff;
+  int head_size = 0;
+  char *buff = NULL;
   // char *header_str;
 	
   buff = (char *)malloc(sizeof(char) * PAGE_SIZE);

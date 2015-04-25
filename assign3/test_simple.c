@@ -135,56 +135,47 @@ void testGetAttr(Schema *schema){
   }
 }
 
-void testFreeRecord(Schema *schema) {
-  Record *record;
-  createRecord(&record, schema);
-  freeRecord(record);
-}
-
-void testInitRecordManager() {
-  initRecordManager(NULL);
-}
-
-void testShutDownRecordManager() {
-  shutdownRecordManager();
-}
-
 
 int main() {
+  printf("\nTesting initRecordManager\n");
+  initRecordManager(NULL);
+  
   printf("\nTesting createSchema...\n");
   Schema *schema;
   schema = testCreateSchema();
 
-  printf("\nTesting getRecordSize\n");
-  int size;
-  size = testgetRecordSize(schema);
+  // printf("\nTesting getRecordSize\n");
+  // int size;
+  // size = testgetRecordSize(schema);
 
   printf("\nTesting createRecord\n");
   Record *record;
   record = testCreateRecord(schema);
-  
-  printf("\nTesting getAttr, setAttr is also tested\n");
-  testGetAttr(schema);
 
-  // printf("\nTesting freeAtttr\n");
-  // testFreeRecord(schema);
+  // printf("\nTesting getAttr, setAttr is also tested\n");
+  // testGetAttr(schema);
 
-  printf("\nTesting initRecordManager\n");
-  //testInitRecordManager();
-  
+  printf("\nTesting freeRecord\n");
+  freeRecord(record);
+
+  printf("\nTesting freeSchema\n");
+  freeSchema(schema);
+
   // printf("\nTESTING READING PAGE 1\n");
   // testReadingPage();
 
   // printf("\nTESTING WRITING PAGE 1\n");
   // testWritingPage();
 
-  printf("\nTesting createTable\n");
-  createTable("stupid_table", schema);
+  // printf("\nTesting createTable\n");
+  // createTable("stupid_table", schema);
 
   printf("\nTesting shutDownRecordManager\n");
-  //testShutDownRecordManager();
+  shutdownRecordManager();
 
-  printf("\nTesting createTable_Header and free_table_header\n");
+  // printf("\nTesting createTable_Header and free_table_header\n");
 
+
+  printf("\n\n*************** TEST FINISHED ***********************\n\n");
   return 0;
 }
