@@ -6,7 +6,7 @@
 #include "buffer_mgr.h"
 #include "rm_serializer.c"
 
-#define PAGES_LIST 1000
+#define PAGES_LIST 100
 
 typedef struct DB_header
 {
@@ -655,6 +655,16 @@ RC insertRecord (RM_TableData *rel, Record *record) {
 
   memcpy(insertOffset, record->data, recordSize);
 
+  //for testing
+/*  Record *testrecord;
+  createRecord(&testrecord, rel->schema);
+  memcpy(testrecord->data, insertOffset, recordSize);
+  char *recordData = serializeRecord(testrecord, rel->schema);
+  printf("\nThe record now have the following data: \n%s\n", recordData);
+  free(recordData);*/
+
+  //end of testing
+
   //makeDirty and unpin the writing page 
   CHECK(markDirty(buffer_manager, page_handler_writing_page));
   CHECK(unpinPage(buffer_manager, page_handler_writing_page));
@@ -804,7 +814,8 @@ RC getRecord (RM_TableData *rel, RID id, Record *record) {
   createRecord(&record, th_header->schema); //create the record
   record->id.page = id.page;
   record->id.slot = id.slot;
-  
+  printf("\nRID of the returned record is page: %d, slot: %d\n", record->id.page, record->id.slot);
+
   memcpy(record->data, readOffset, recordSize);
 
   //free headers
@@ -814,7 +825,12 @@ RC getRecord (RM_TableData *rel, RID id, Record *record) {
   CHECK(unpinPage(buffer_manager, page_handler_reading_page));
   CHECK(unpinPage(buffer_manager, page_handler_table));
   CHECK(unpinPage(buffer_manager, page_handler_db));
-
+  
+  //for testing, to print recond info
+  char *recordData = serializeRecord(record, rel->schema);
+  printf("\nThe record now have the following data: \n%s\n", recordData);
+  free(recordData);
+  
   return RC_OK;
 }
 

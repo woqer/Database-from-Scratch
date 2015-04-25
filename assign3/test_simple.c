@@ -28,7 +28,11 @@ Schema  *testCreateSchema() {
   keySize = 123;
   keys = (int []) {123};
 
-  printf("numAttr:\t\t%i\n", schema->numAttr);
+  char *schemaData = serializeSchema(schema);
+  printf("\nThe schema now has the following data:\n%s\n", schemaData);
+  free(schemaData);
+
+  /*printf("numAttr:\t\t%i\n", schema->numAttr);
   printf("keySize:\t\t%i\n", schema->keySize);
 
   int i;
@@ -39,7 +43,7 @@ Schema  *testCreateSchema() {
   }
   for (i = 0; i < schema->keySize; i++) {
     printf("keyAttrs[%i]:\t\t%i\n", i, (schema->keyAttrs)[i]);
-  }  
+  }  */
 
   return schema;
 }
@@ -90,13 +94,17 @@ Record *testSetAttr(Schema *schema)
 	setAttr(record, schema, 3, val_3);
 	setAttr(record, schema, 4, val_4);
 	
+  char *recordData = serializeRecord(record, schema);
+  printf("\nThe record now have the following data: \n%s", recordData);
+  free(recordData);
+
 	return record;
 }
 
 Record *testGetAttr(Schema *schema){
   Record *record;
   record = testSetAttr(schema);  
-  
+
   int i;
   for(i=0; i<schema->numAttr; i++)
   {
@@ -178,11 +186,17 @@ void testInsertRecord(RM_TableData *rel, Record *record) {
 }
 
 void testGetRecord(RM_TableData *rel) {
-  RID *id = (RID *)malloc(sizeof(RID *));
-  id->page = 0;
-  id->slot = 1;
-  Record *record = (Record *)malloc(sizeof(Record *));
-  getRecord(rel, *id, record);
+  RID id;
+  id.page = 0;
+  id.slot = 0;
+  Record *record;
+  RC r = getRecord(rel, id, record);
+  printf("\nReturn code from getRecord is %d\n", r);
+  printf("\nRID of the returned record is page: %d, slot: %d\n", record->id.page, record->id.slot);
+
+  char *recordData = serializeRecord(record, rel->schema);
+  printf("\nThe record now have the following data: \n%s\n", recordData);
+  free(recordData);
 }
 
 
@@ -201,7 +215,7 @@ int main() {
   Schema *schema = testCreateSchema();
 
   printf("\n Testing create record\n");
-  Record *record = testCreateRecord(schema);
+  Record *record = testSetAttr(schema);
 
   printf("\n**********************Testing createTable******************\n");
   createTable("stupid_table", schema);
