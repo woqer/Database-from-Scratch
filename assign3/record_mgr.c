@@ -290,8 +290,8 @@ char *write_table_serializer(Table_Header *th) {
   for (i = 0; i < active_size; i++) {
     memcpy(out + offset, &(th->active[i]), bool_size);
     offset += bool_size;
-    if (th->active[i])
-      printf("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW_table_serializer: memcpy a value of true on position %i\n", i);
+    // if (th->active[i])
+      // printf("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW_table_serializer: memcpy a value of true on position %i\n", i);
   }
 
   char *sch_data = write_schema_serializer(th->schema);
@@ -393,8 +393,8 @@ Table_Header *read_table_serializer(char *data) {
   for(i = 0; i < active_size; i++) {
     memcpy(&(th->active[i]), data + offset, bool_size);
     offset += bool_size;
-    if (th->active[i])
-      printf("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR_table_serializer: memcpy a value of true on position %i\n", i);
+    // if (th->active[i])
+      // printf("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR_table_serializer: memcpy a value of true on position %i\n", i);
   }
 
   Schema *schema_aux = read_schema_serializer(data + offset);
@@ -407,19 +407,19 @@ Table_Header *read_table_serializer(char *data) {
   return th;
 }
 
-void testWritingPage() {
-  CHECK(pinPage(buffer_manager, page_handler_db, 1));
-  sprintf(page_handler_db->data, "BOQUEPASA");
-  CHECK(markDirty(buffer_manager, page_handler_db));
-  CHECK(unpinPage(buffer_manager, page_handler_db));
+// void testWritingPage() {
+//   CHECK(pinPage(buffer_manager, page_handler_db, 1));
+//   sprintf(page_handler_db->data, "BOQUEPASA");
+//   CHECK(markDirty(buffer_manager, page_handler_db));
+//   CHECK(unpinPage(buffer_manager, page_handler_db));
 
-}
+// }
 
-void testReadingPage() {
-  CHECK(pinPage(buffer_manager, page_handler_db, 1));
-  printf("Page-1: %s\n", page_handler_db->data);
-  CHECK(unpinPage(buffer_manager, page_handler_db));
-}
+// void testReadingPage() {
+//   CHECK(pinPage(buffer_manager, page_handler_db, 1));
+//   printf("Page-1: %s\n", page_handler_db->data);
+//   CHECK(unpinPage(buffer_manager, page_handler_db));
+// }
 
 // table and manager
 RC initRecordManager (void *mgmtData) {
@@ -500,7 +500,7 @@ RC createTable (char *name, Schema *schema) {
   CHECK(pinPage(buffer_manager, page_handler_db, 0));  
   DB_header *db_header = read_db_serializer(page_handler_db->data);
 
-  printf("createTable: db_header pinned and serialized, using info for setting up table...\n");
+  // printf("createTable: db_header pinned and serialized, using info for setting up table...\n");
   printDB_Header(db_header);
   // nextAvailPage is for table header and the next one will be the first page
   // to write records on this table
@@ -512,7 +512,7 @@ RC createTable (char *name, Schema *schema) {
   CHECK(pinPage(buffer_manager, page_handler_empty, table_page_num + 1));
   CHECK(unpinPage(buffer_manager, page_handler_empty));
 
-  printf("createTable: pined and unpinned empty page, proceeding to add_table_to_header\n");
+  // printf("createTable: pined and unpinned empty page, proceeding to add_table_to_header\n");
   // two pages used, one for table header, other for first records on new table
   db_header->nextAvailPage += 2;
   add_table_to_header(db_header, table_page_num, name);
@@ -529,7 +529,7 @@ RC createTable (char *name, Schema *schema) {
   markDirty(buffer_manager, page_handler_db);
   unpinPage(buffer_manager, page_handler_db);
 
-  printf("Returning from createTable\n");
+  // printf("Returning from createTable\n");
 
   return RC_OK;
 }
@@ -686,8 +686,6 @@ RC deleteRecord (RM_TableData *rel, RID id) {
 
   CHECK(pinPage(buffer_manager, page_handler_db, 0)); 
   DB_header *db_header = read_db_serializer(page_handler_db->data); 
-
-  RID id = record->id;
   
   int table_pos_in_array = searchStringArray(tableName, db_header->tableNames, db_header->numTables);
   if(table_pos_in_array < 0) return RC_TABLE_NOT_FOUND;
@@ -696,10 +694,11 @@ RC deleteRecord (RM_TableData *rel, RID id) {
   
   BM_PageHandle *page_handler_table = MAKE_PAGE_HANDLE(); 
   CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
+  
   Table_Header *th_header = read_table_serializer(page_handler_table->data); 
    
   int active_index = (id.page) * (th_header->slots_per_page) + id.slot;
-  if(!th_header->active[active_index]) return RC_RECORD_NOT_ACTIVE;
+  if(!(th_header->active[active_index])) return RC_RECORD_NOT_ACTIVE;
   
   if(th_header->active[active_index]) {
     th_header->active[active_index] = false;
@@ -707,16 +706,18 @@ RC deleteRecord (RM_TableData *rel, RID id) {
     return RC_RECORD_NOT_ACTIVE;
   }
   
-  char *t_header_data = write_db_serializer(th_header);  
-  memcpy(page_handler_table->data, table_header_data, getTable_Header_Size(th_header));
+  char *t_header_data = write_table_serializer(th_header);  
+  memcpy(page_handler_table->data, t_header_data, getTable_Header_Size(th_header));
   
   
   CHECK(markDirty(buffer_manager, page_handler_table));
   
   CHECK(unpinPage(buffer_manager, page_handler_table));
+  CHECK(unpinPage(buffer_manager, page_handler_db));
 
   free(t_header_data);
-  
+  free_db_header(db_header);
+  free_table_header(th_header);
 
   return RC_OK;
 }
@@ -872,13 +873,13 @@ RC next (RM_ScanHandle *scan, Record *record) {
 
   if(sp->cond == NULL)
     MAKE_VALUE(result, DT_BOOL, true);
-  printf("%s", result->v.boolV ? "true" : "false");
+  // printf("%s", result->v.boolV ? "true" : "false");
   while((returnCode = getRecord(scan->rel, *id, currentRecord)) != RC_RECORD_OUT_OF_RANGE)
   {
     if(returnCode == RC_RECORD_NOT_ACTIVE) continue;
     
     if(sp->cond != NULL)
-        evalExpr(currentRecord, scan->rel->schema, sp->cond, &result);
+      evalExpr(currentRecord, scan->rel->schema, sp->cond, &result);
     
     if(result->v.boolV) {
       record = currentRecord; //?? or make a copy of current record??
@@ -1039,7 +1040,7 @@ RC getAttr (Record *record, Schema *schema, int attrNum, Value **value) {
   }
   
   *value = val;
-  
+
   return RC_OK;
 }
 
