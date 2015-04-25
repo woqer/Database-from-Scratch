@@ -6,6 +6,7 @@
 #include "tables.h"
 #include "test_helper.h"
 
+
 Schema  *testCreateSchema() {
   int numAttr = 5;
   char **attrNames = (char *[]) {"id", "name", "last_name", "weight", "active"};
@@ -92,7 +93,7 @@ Record *testSetAttr(Schema *schema)
 	return record;
 }
 
-void testGetAttr(Schema *schema){
+Record *testGetAttr(Schema *schema){
   Record *record;
   record = testSetAttr(schema);  
   
@@ -133,58 +134,102 @@ void testGetAttr(Schema *schema){
     default: break;
     }
   }
+  return record;
 }
 
-void testFreeRecord(Schema *schema) {
-  Record *record;
-  createRecord(&record, schema);
-  freeRecord(record);
+
+RM_TableData *testOpenTable() {
+  RM_TableData *rel = (RM_TableData *)malloc(sizeof(RM_TableData *));
+  RC return_code = openTable(rel, "stupid_table");
+  
+  printf("\nstupid_table opened\n");
+  char *table_data = serializeTableContent(rel);
+  printf("\n%s\n", table_data);
+  free(table_data);
+  /*printf("\nTable name in the RM_TableData structure\t\t%s\n", rel->name);
+  printf("\nSchema in the RM_TableData structure:\n");
+  printSchema(rel->schema);*/
+  printf("\nReturn code from openTable: \t\t%d\n", return_code);
+  return rel;
 }
 
-void testInitRecordManager() {
-  initRecordManager(NULL);
+void testDeleteTable()
+{
+  RC return_code = deleteTable("stupid_table");
+  printf("\nReturn code from deleteTable: \t\t%d\n", return_code);
+  printf("\nstupid_table deleted\n");
 }
 
-void testShutDownRecordManager() {
-  shutdownRecordManager();
+void testInsertRecord(RM_TableData *rel, Record *record) {
+  printf("The number of tuples before any insertion is\t\t%d\n", getNumTuples(rel));
+  insertRecord(rel, record);
+  printf("The number of tuples after one insertion is\t\t%d\n", getNumTuples(rel));
+
+  //insert again
+  insertRecord(rel, record);
+  printf("The number of tuples after two insertions is\t\t%d\n", getNumTuples(rel));
+  printf("\nTable name in the RM_TableData structure\t\t%s\n", rel->name);
+  printf("\nSchema in the RM_TableData structure:\n");
+  printSchema(rel->schema);
+/*  char *table_data = serializeTableContent(rel);
+  printf("got here");
+  printf("\n%s\n", table_data);
+  free(table_data);*/
+}
+
+void testGetRecord(RM_TableData *rel) {
+  RID *id = (RID *)malloc(sizeof(RID *));
+  id->page = 0;
+  id->slot = 1;
+  Record *record = (Record *)malloc(sizeof(Record *));
+  getRecord(rel, *id, record);
 }
 
 
 int main() {
-  printf("\nTesting createSchema...\n");
-  Schema *schema;
-  schema = testCreateSchema();
-
-  printf("\nTesting getRecordSize\n");
-  int size;
-  size = testgetRecordSize(schema);
-
-  printf("\nTesting createRecord\n");
-  Record *record;
-  record = testCreateRecord(schema);
+  printf("\n************************Testing initRecordManager************************\n");
+  initRecordManager(NULL);
   
-  printf("\nTesting getAttr, setAttr is also tested\n");
-  testGetAttr(schema);
 
-  // printf("\nTesting freeAtttr\n");
-  // testFreeRecord(schema);
-
-  printf("\nTesting initRecordManager\n");
-  //testInitRecordManager();
-  
   // printf("\nTESTING READING PAGE 1\n");
   // testReadingPage();
 
   // printf("\nTESTING WRITING PAGE 1\n");
   // testWritingPage();
 
-  printf("\nTesting createTable\n");
+  printf("\n Testing creating schema\n");
+  Schema *schema = testCreateSchema();
+
+  printf("\n Testing create record\n");
+  Record *record = testCreateRecord(schema);
+
+  printf("\n**********************Testing createTable******************\n");
   createTable("stupid_table", schema);
 
+  printf("\n***********************Testing openTable*********************\n");
+  RM_TableData *rel = testOpenTable();
+  /*printf("\nTesting shutDownRecordManager\n");
+  testShutDownRecordManager();
+*/
+
+  //printf("\n***********************Testing deleteTable*********************\n");
+  //testDeleteTable();
+
+  printf("\n***********************Testing insertRecord*********************\n");
+  testInsertRecord(rel, record);
+
+  printf("\n***********************Testing getRecord*********************\n");
+  testGetRecord(rel);
+
+  // printf("\nTesting createTable\n");
+  // createTable("stupid_table", schema);
+
   printf("\nTesting shutDownRecordManager\n");
-  //testShutDownRecordManager();
+  shutdownRecordManager();
 
-  printf("\nTesting createTable_Header and free_table_header\n");
+  // printf("\nTesting createTable_Header and free_table_header\n");
 
+
+  printf("\n\n*************** TEST FINISHED ***********************\n\n");
   return 0;
 }
