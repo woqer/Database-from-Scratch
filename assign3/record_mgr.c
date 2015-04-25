@@ -88,8 +88,10 @@ DB_header *createDB_header() {
 void free_db_header(DB_header *head) {
   int i;
   for (i = 0; i < MAX_N_TABLES; i++) {
+    // printf("Freeing tableNames[%i]: %s\n", i, head->tableNames[i]);
     free(head->tableNames[i]);
   }
+  // printf("Freeing tableNames");
   free(head->tableNames);
   free(head->tableHeaders);
   free(head);
@@ -101,12 +103,6 @@ void free_table_header(Table_Header *th) {
   free(th);
 }
 
-void add_table_to_header(DB_header *header, int tablePage, char* tableName) {
-  header->tableHeaders[header->numTables] = tablePage;
-  header->tableNames[header->numTables] = tableName;
-  header->numTables++;
-  header->nextAvailPage = tablePage + 2;
-}
 
 // returns the current available slot
 void add_record_to_header(Table_Header *th, DB_header *db_header) {
@@ -118,13 +114,15 @@ void add_record_to_header(Table_Header *th, DB_header *db_header) {
     // need a new page
     th->nextSlot = 0;
     
-    if (th->numPages % PAGES_LIST) {
+    if ((th->numPages % PAGES_LIST) == 0) {
       // realloc pagesList
+      printf("Reallocing memory!!! numPages = %d\n", th->numPages);
       th->pagesList = (int *)realloc(th->pagesList, sizeof(int) * th->numPages);
     }
 
-    th->active = (bool *)realloc(th->active, sizeof(bool) * th->slots_per_page);
     th->pagesList[th->numPages++] = db_header->nextAvailPage++;
+    printf("Reallocing th->active to length %d\n", th->slots_per_page * th->numPages);
+    th->active = (bool *)realloc(th->active, sizeof(bool) * th->slots_per_page * th->numPages);
 
   } else {
     th->nextSlot++;
@@ -501,9 +499,11 @@ RC createTable (char *name, Schema *schema) {
   DB_header *db_header = read_db_serializer(page_handler_db->data);
 
   // printf("createTable: db_header pinned and serialized, using info for setting up table...\n");
-  printDB_Header(db_header);
+  // printDB_Header(db_header);
   // nextAvailPage is for table header and the next one will be the first page
   // to write records on this table
+  printDB_Header(db_header);
+
   int table_page_num = db_header->nextAvailPage;
   CHECK(pinPage(buffer_manager, page_handler_table, table_page_num));
   th->pagesList[th->numPages++] = table_page_num + 1;
@@ -512,10 +512,13 @@ RC createTable (char *name, Schema *schema) {
   CHECK(pinPage(buffer_manager, page_handler_empty, table_page_num + 1));
   CHECK(unpinPage(buffer_manager, page_handler_empty));
 
-  // printf("createTable: pined and unpinned empty page, proceeding to add_table_to_header\n");
-  // two pages used, one for table header, other for first records on new table
+  // update db_header
+  db_header->tableHeaders[db_header->numTables] = table_page_num;
+  strcpy(db_header->tableNames[db_header->numTables], name);
+  db_header->numTables++;
   db_header->nextAvailPage += 2;
-  add_table_to_header(db_header, table_page_num, name);
+
+  printDB_Header(db_header);
 
   char *table_data = write_table_serializer(th);
   memcpy(page_handler_table->data, table_data, getTable_Header_Size(th));
@@ -528,6 +531,14 @@ RC createTable (char *name, Schema *schema) {
   free(db_data);
   markDirty(buffer_manager, page_handler_db);
   unpinPage(buffer_manager, page_handler_db);
+
+  // free(page_handler_table);
+  // free(page_handler_empty);
+
+  printf("Freeing table header...\n");
+  free_table_header(th);
+  printf("Freeing db header...\n");
+  free_db_header(db_header);
 
   // printf("Returning from createTable\n");
 
@@ -555,6 +566,10 @@ RC openTable (RM_TableData *rel, char *name) {
 
   Schema *schema = th_header->schema;
   rel->schema = createSchema (schema->numAttr, schema->attrNames, schema->dataTypes, schema->typeLength, schema->keySize, schema->keyAttrs);
+
+  CHECK(markDirty(buffer_manager, page_handler_table));
+  CHECK(unpinPage(buffer_manager, page_handler_table));
+  CHECK(unpinPage(buffer_manager, page_handler_db));
 
   free_table_header(th_header);
   free_db_header(db_header);
@@ -677,16 +692,16 @@ RC insertRecord (RM_TableData *rel, Record *record) {
   memcpy(page_handler_table->data, table_header_data, getTable_Header_Size(th_header));
   free(table_header_data);
   free_table_header(th_header);
-  CHECK(unpinPage(buffer_manager, page_handler_table));
   CHECK(markDirty(buffer_manager, page_handler_table));
+  CHECK(unpinPage(buffer_manager, page_handler_table));
 
   //update database header
   char *db_header_data = write_db_serializer(db_header);
   memcpy(page_handler_db->data, db_header_data, getDB_HeaderSize());
   free(db_header_data);
   free_db_header(db_header);
-  CHECK(unpinPage(buffer_manager, page_handler_db));
   CHECK(markDirty(buffer_manager, page_handler_db));
+  CHECK(unpinPage(buffer_manager, page_handler_db));
 
   return RC_OK;
 }

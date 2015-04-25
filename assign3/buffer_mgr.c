@@ -172,9 +172,9 @@ void free_pool(BM_BufferPool *bm) {
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
   SM_FileHandle *fh = (SM_FileHandle *)pi->fh;
 
+  // printf("Freeing %i pages...\n", bm->numPages);
   int i;
   for (i = 0; i < bm->numPages; i++) {
-    // printf("Freeing %i pages...\n", bm->numPages);
     // printf("free(pi->frames[%d])\n", i);
     // printf("pi->frames[%i] info: %s\n", i,pi->frames[i]);
     free(pi->frames[i]);

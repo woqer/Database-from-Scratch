@@ -1,8 +1,12 @@
 DEBUG ?= 1
-	OPT = ""
+OPT =
+
 ifneq (DEBUG, 1)
 	OPT = -g
 endif
+
+
+
 
 all: simple expr main
 
