@@ -114,13 +114,15 @@ void add_record_to_header(Table_Header *th, DB_header *db_header) {
     // need a new page
     th->nextSlot = 0;
     
-    if (th->numPages % PAGES_LIST) {
+    if ((th->numPages % PAGES_LIST) == 0) {
       // realloc pagesList
+      printf("Reallocing memory!!! numPages = %d\n", th->numPages);
       th->pagesList = (int *)realloc(th->pagesList, sizeof(int) * th->numPages);
     }
 
-    th->active = (bool *)realloc(th->active, sizeof(bool) * th->slots_per_page);
     th->pagesList[th->numPages++] = db_header->nextAvailPage++;
+    printf("Reallocing th->active to length %d\n", th->slots_per_page * th->numPages);
+    th->active = (bool *)realloc(th->active, sizeof(bool) * th->slots_per_page * th->numPages);
 
   } else {
     th->nextSlot++;
