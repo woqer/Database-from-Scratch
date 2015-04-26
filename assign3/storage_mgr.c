@@ -294,6 +294,8 @@ writeBlock (int pageNum, SM_FileHandle *fHandle, SM_PageHandle memPage)
 	if (fwrite(memPage, sizeof(char)*PAGE_SIZE, 1, fp) < 1) return RC_WRITE_FAILED;
   // printf("WRITED TO DISK (page-%i): %s\n", pageNum, memPage);
 
+  // printf("#### Writed page (%d) to disk! ####\n", pageNum);
+
 	fHandle->curPagePos = pageNum;
 
 	free(buff);

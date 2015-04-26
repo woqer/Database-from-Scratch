@@ -173,7 +173,7 @@ Record *testGetAttr(Schema *schema){
 
 
 RM_TableData *testOpenTable() {
-  RM_TableData *rel = (RM_TableData *)malloc(sizeof(RM_TableData *));
+  RM_TableData *rel = (RM_TableData *)malloc(sizeof(RM_TableData));
   RC return_code = openTable(rel, "stupid_table");
   
   printf("\nstupid_table opened\n");
@@ -290,6 +290,16 @@ int main() {
 
   printf("\n**********************Testing createTable******************\n");
   createTable("stupid_table", schema);
+  createTable("another_table", schema);
+
+
+
+  // printf("\n*********************Testing shutDownRecordManager**********************\n");
+  // shutdownRecordManager();
+  // exit(0);
+
+
+
 
   printf("\n***********************Testing openTable*********************\n");
   RM_TableData *rel = testOpenTable();
@@ -328,11 +338,8 @@ int main() {
   printf("\nTesting freeing schema\n");
   freeSchema(schema);
 
-  //printf("\n*********************Testing shutDownRecordManager**********************\n");
-  //testShutDownRecordManager();
-  
-  // printf("\nTesting shutDownRecordManager\n");
-  //shutdownRecordManager();
+  printf("\n*********************Testing shutDownRecordManager**********************\n");
+  shutdownRecordManager();
 
   // printf("\nTesting createTable_Header and free_table_header\n");
 
