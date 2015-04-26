@@ -175,7 +175,7 @@ serializeAttr(Record *record, Schema *schema, int attrNum)
   char *attrData;
   VarString *result;
   MAKE_VARSTRING(result);
-  
+
   attrOffset(schema, attrNum, &offset);
   attrData = record->data + offset;
 

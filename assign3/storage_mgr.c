@@ -20,16 +20,22 @@ int
 readHeader (FILE *fp)
 {
   int head_size = 0;
-  char *buff = NULL;
+  char *buff;
   // char *header_str;
 	
-  buff = (char *)malloc(sizeof(char) * PAGE_SIZE);
+  // buff = (char *)malloc(sizeof(char) * PAGE_SIZE);
 	// header_str = (char *)malloc(16);
 
+  buff = malloc(sizeof(*buff) * PAGE_SIZE);
+
+
   // fread(header_str, sizeof(char)*HEADER_SIZE, 1, fp);
-	fread(buff, sizeof(char)*HEADER_SIZE, 1, fp);
-  head_size = atoi(buff);
-	fread(buff, sizeof(char)*(PAGE_SIZE - HEADER_SIZE), 1, fp);
+	// fread(buff, sizeof(char)*HEADER_SIZE, 1, fp);
+ //  head_size = atoi(buff);
+	// fread(buff, sizeof(char)*(PAGE_SIZE - HEADER_SIZE), 1, fp);
+
+  fread(buff, sizeof(*buff) * PAGE_SIZE, 1, fp);
+  memcpy(&head_size, buff, sizeof(head_size));
 
 	free(buff);
 
@@ -49,20 +55,31 @@ writeHeader (FILE *fp, int totalNumPages)
 	char *header;
 	char zero = '\0';
 
-	header = (char*)malloc(sizeof(char)*HEADER_SIZE);
+	// header = (char*)malloc(sizeof(char)*HEADER_SIZE);
 
-  sprintf(header, "%06d", totalNumPages);
+ //  sprintf(header, "%06d", totalNumPages);
+
+  header = malloc(sizeof(*header) * PAGE_SIZE);
+  memset(header, 0, sizeof(*header) * PAGE_SIZE);
+
+  memcpy(header, &totalNumPages, sizeof(totalNumPages));
+
 	// printf("%06d\n", totalNumPages);
 
 	fseek(fp, 0L, SEEK_SET);
-	if ((size_header = fwrite(header, sizeof(char)*HEADER_SIZE, 1, fp)) < 1) {
-		// printf("\nWRITEHEADER(header): size_header %d\n", size_header);
-		return RC_FILE_R_W_ERROR;
-	}
-	if ((size_header = fwrite(&zero, sizeof(char), PAGE_SIZE - HEADER_SIZE, fp)) < 1) {
-		// printf("\nWRITEHEADER(zeros): size_header %d\n", size_header);
-		return RC_FILE_R_W_ERROR;
-	}
+	// if ((size_header = fwrite(header, sizeof(char)*HEADER_SIZE, 1, fp)) < 1) {
+	// 	// printf("\nWRITEHEADER(header): size_header %d\n", size_header);
+	// 	return RC_FILE_R_W_ERROR;
+	// }
+	// if ((size_header = fwrite(&zero, sizeof(char), PAGE_SIZE - HEADER_SIZE, fp)) < 1) {
+	// 	// printf("\nWRITEHEADER(zeros): size_header %d\n", size_header);
+	// 	return RC_FILE_R_W_ERROR;
+	// }
+
+  if ((size_header = fwrite(header, sizeof(*header) * PAGE_SIZE, 1, fp)) < 1) {
+    return RC_FILE_R_W_ERROR;
+  }
+
 
 	free(header);
 	// printf("\nWRITEHEADER(return): size_header %d\n", size_header);

@@ -282,15 +282,19 @@ int main() {
   // printf("\nTESTING WRITING PAGE 1\n");
   // testWritingPage();
 
-  printf("\n Testing creating schema\n");
+  printf("\n********************** Testing creating schema **********************\n");
   Schema *schema = testCreateSchema();
 
-  printf("\n Testing create record\n");
+  printf("\n********************** Testing create record **********************\n");
   Record *record = testSetAttr(schema);
 
   printf("\n**********************Testing createTable******************\n");
   createTable("stupid_table", schema);
-  createTable("another_table", schema);
+  // createTable("another_table", schema);
+
+  printf("\n***********************Testing openTable*********************\n");
+  RM_TableData *rel = testOpenTable();
+
 
 
 
@@ -300,9 +304,6 @@ int main() {
 
 
 
-
-  printf("\n***********************Testing openTable*********************\n");
-  RM_TableData *rel = testOpenTable();
 
 
   //printf("\n***********************Testing deleteTable*********************\n");

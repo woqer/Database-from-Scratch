@@ -213,7 +213,10 @@ RC shutdownBufferPool(BM_BufferPool *const bm) {
 
   int i;
   for (i = 0; i < bm->numPages; i++) {
-    if (pi->fixCounter[i] != 0) pinned_free = false;
+    if (pi->fixCounter[i] != 0) {
+      printf("buffer_mrg: PINNED PAGE (%d) with fixCounter (%d)\n", pi->map[i], pi->fixCounter[i]);
+      pinned_free = false;
+    }
   }
 
   if(pinned_free) {
@@ -283,13 +286,18 @@ RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page,
     pi->dirtys[index] = false;
   }
 
+  printf("buffer_mgr.readPageFIFO: before any returning code\n");
+
   if (pageNum >= fh->totalNumPages) {
+    printf("buffer_mgr.readPageFIFO: appending... pageNum (%d) fh->totalNumPages (%d)\n", pageNum, fh->totalNumPages);
     rc_code = appendEmptyBlock(fh);
     // NumWriteIO++;
+    printf("buffer_mgr.readPageFIFO: appended returned (%d)\n", rc_code);
+
     if (rc_code != RC_OK) return rc_code;
   }
 
-  // printf("READING FROM DISK PAGE %i\n", pageNum);
+  printf("READING FROM DISK PAGE %i\n", pageNum);
   rc_code = readBlock(pageNum, fh, memPage);
   NumReadIO++;
 
@@ -392,6 +400,8 @@ RC unpinPage (BM_BufferPool *const bm, BM_PageHandle *const page) {
   int index = searchArray(page->pageNum, pi->map, pi->numPages);
   pi->fixCounter[index]--;
 
+  // printf("buffer_mgr: unpinning page (%d) with fixCounter (%d)\n", page->pageNum, pi->fixCounter[index]);
+
   // if (bm->strategy == RS_LRU) {
   //   pi->lru_stamp = update_lru(index, pi->lru_stamp, pi->numPages);
   // }
@@ -465,6 +475,7 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
       update_lru(index, pi->lru_stamp, pi->numPages);
     }
   }
+  // printf("buffer_mgr: pinning page (%d) with fixcounter (%d)\n", pageNum, pi->fixCounter[index]);
   return rc_code;
 }
 
