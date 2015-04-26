@@ -384,7 +384,7 @@ testInsertManyRecords(void)
   for(i = 0; i < numInserts; i++)
     {
       // if (i > 340 && i < 345) printf("INSERTING RECORD #(%d)\n", i);
-      if (i > 2000) exit(0);
+      // if (i > 2000) exit(0);
       realInserts[i] = inserts[i%10];
       realInserts[i].a = i;
       r = fromTestRecord(schema, realInserts[i]);

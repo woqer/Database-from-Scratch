@@ -275,6 +275,12 @@ int main() {
   printf("\n************************Testing initRecordManager************************\n");
   initRecordManager(NULL);
   
+  // printf("\n************************Testing db serializers************************\n");
+  // int i;
+  // for (i = 0; i < 10000; i++) {
+  //   testSerializers();
+  // }
+
 
   // printf("\nTESTING READING PAGE 1\n");
   // testReadingPage();
@@ -297,26 +303,33 @@ int main() {
 
 
 
-
-  // printf("\n*********************Testing shutDownRecordManager**********************\n");
-  // shutdownRecordManager();
-  // exit(0);
-
-
-
-
-
   //printf("\n***********************Testing deleteTable*********************\n");
   //testDeleteTable();
 
   printf("\n***********************Testing insertRecord*********************\n");
   testInsertRecord(rel, record);
 
+  int i;
+  for (i = 0; i < 10000; i++) {
+    testInsertRecord(rel, record);
+  }
+
+
   printf("\n***********************Testing getRecord*********************\n");
   RID id;
   id.page = 0;
   id.slot = 0;
   testGetRecord(rel, id);
+
+
+
+
+
+  printf("\n*********************Testing shutDownRecordManager**********************\n");
+  shutdownRecordManager();
+  exit(0);
+
+
 
   printf("\n***********************Testing updateRecord*********************\n");
   Record *anotherRecord = testAnotherSetAttr(rel->schema);

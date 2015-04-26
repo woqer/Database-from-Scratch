@@ -338,7 +338,7 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 	FILE *fp;
 	int totalNumPages, i, h_size;
 	char *buff;
-	char zero = '\0';
+	// char zero = '\0';
 
 	if (access(fHandle->fileName, R_OK) < 0) return RC_FILE_NOT_FOUND;
 
@@ -366,7 +366,15 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 		// printf("APPEND: iteration %d\n", i);
 	}
 	fseek(fp, 0L, SEEK_CUR);
-	fwrite(&zero, sizeof(char), PAGE_SIZE, fp);
+	// fwrite(&zero, sizeof(char), PAGE_SIZE, fp);
+
+  printf("Appending page...\n");
+  memset(buff, 0, sizeof(*buff) * PAGE_SIZE);
+  fwrite(buff, sizeof(*buff) * PAGE_SIZE, 1, fp);
+  printf("End of appending page...\n");
+
+
+
 
 	fHandle->totalNumPages++;
 	fHandle->curPagePos;

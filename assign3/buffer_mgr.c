@@ -321,7 +321,8 @@ void update_lru(int index, int *ary, int length) {
   int pointer;
 
   int *result;
-  result =  (int *)malloc(sizeof(int) * length);
+  result = malloc(sizeof(*result) * length);
+
   int i;
   for(i = 0; i <length; i++) {
     *(result + i) = *(ary + i);
