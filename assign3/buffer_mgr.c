@@ -123,11 +123,13 @@ RC initPoolInfo(unsigned int numPages, SM_FileHandle *fh, BM_PoolInfo *pi) {
     pi->fixCounter[i] = 0;
     pi->map[i] = -1;
     pi->lru_stamp[i] = i;
-    pi->frames[i] = (char *)malloc(sizeof(char)*PAGE_SIZE);
+    pi->frames[i] = malloc(sizeof(char)*PAGE_SIZE);
 
-    for (j = 0; j < PAGE_SIZE; j++) {
-      pi->frames[i][j] = '\0';
-    }
+    memset(pi->frames[i], 0, sizeof(( *(pi->frames[i]) ) * PAGE_SIZE));
+
+    // for (j = 0; j < PAGE_SIZE; j++) {
+    //   pi->frames[i][j] = '\0';
+    // }
   }
 
   return rc_code;
@@ -172,10 +174,10 @@ void free_pool(BM_BufferPool *bm) {
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
   SM_FileHandle *fh = (SM_FileHandle *)pi->fh;
 
-  // printf("Freeing %i pages...\n", bm->numPages);
+  printf("Freeing %i pages...\n", bm->numPages);
   int i;
   for (i = 0; i < bm->numPages; i++) {
-    // printf("free(pi->frames[%d])\n", i);
+    printf("free(pi->frames[%d]), Page (%d)\n", i, pi->map[i]);
     // printf("pi->frames[%i] info: %s\n", i,pi->frames[i]);
     free(pi->frames[i]);
   }
@@ -220,7 +222,7 @@ RC shutdownBufferPool(BM_BufferPool *const bm) {
   }
 
   if(pinned_free) {
-    
+    printf("--- Before free_pool... ---\n");
     free_pool(bm);
     
     return RC_OK;

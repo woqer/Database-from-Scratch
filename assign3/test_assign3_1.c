@@ -398,6 +398,9 @@ testInsertManyRecords(void)
   for(i = 0; i < numInserts; i++)
     {
       RID rid = rids[i];
+      
+      printf("Testing #(%d) getRecord [%d-%d]\n", i, rid.page, rid.slot);
+      
       TEST_CHECK(getRecord(table, rid, r));
       ASSERT_EQUALS_RECORDS(fromTestRecord(schema, realInserts[i]), r, schema, "compare records");
     }

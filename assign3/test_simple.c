@@ -195,16 +195,20 @@ void testDeleteTable()
 }
 
 void testInsertRecord(RM_TableData *rel, Record *record) {
-  printf("The number of tuples before any insertion is\t\t%d\n", getNumTuples(rel));
-  insertRecord(rel, record);
-  printf("The number of tuples after one insertion is\t\t%d\n", getNumTuples(rel));
+  // printf("The number of tuples before any insertion is\t\t%d\n", getNumTuples(rel));
+  // insertRecord(rel, record);
+  // printf("The number of tuples after one insertion is\t\t%d\n", getNumTuples(rel));
 
   //insert again
   insertRecord(rel, record);
-  printf("The number of tuples after two insertions is\t\t%d\n", getNumTuples(rel));
-  printf("\nTable name in the RM_TableData structure\t\t%s\n", rel->name);
-  printf("\nSchema in the RM_TableData structure:\n");
-  printSchema(rel->schema);
+  // printf("The number of tuples after two insertions is\t\t%d\n", getNumTuples(rel));
+  // printf("\nTable name in the RM_TableData structure\t\t%s\n", rel->name);
+
+  // printf("\nSchema in the RM_TableData structure:\n");
+  // printSchema(rel->schema);
+
+  printf("Inserted: %s\n", serializeRecord(record, rel->schema));
+
 /*  char *table_data = serializeTableContent(rel);
   printf("got here");
   printf("\n%s\n", table_data);
@@ -222,11 +226,11 @@ void testGetRecord(RM_TableData *rel, RID id) {
   printf("\nThe record now have the following data: \n%s\n", recordData);
   free(recordData);
 
-  printf("Test record not found\n");
-  id.page = 0;
-  id.slot = 2;
-  r = getRecord(rel, id, record);
-  printf("\nReturn code from getRecord is %d\n", r);
+  // printf("Test record not found\n");
+  // id.page = 0;
+  // id.slot = 2;
+  // r = getRecord(rel, id, record);
+  // printf("\nReturn code from getRecord is %d\n", r);
 }
 
 void testUpdateRecord(RM_TableData *rel, Record *anotherRecord) {
@@ -272,15 +276,19 @@ void testNext(RM_ScanHandle *scan) {
 
 
 int main() {
+  int i;
+
   printf("\n************************Testing initRecordManager************************\n");
   initRecordManager(NULL);
   
   // printf("\n************************Testing db serializers************************\n");
-  // int i;
   // for (i = 0; i < 10000; i++) {
   //   testSerializers();
   // }
 
+  // printf("\n*********************Testing shutDownRecordManager**********************\n");
+  // shutdownRecordManager();
+  // exit(0);
 
   // printf("\nTESTING READING PAGE 1\n");
   // testReadingPage();
@@ -307,11 +315,11 @@ int main() {
   //testDeleteTable();
 
   printf("\n***********************Testing insertRecord*********************\n");
-  testInsertRecord(rel, record);
-
-  int i;
-  for (i = 0; i < 10000; i++) {
+  // testInsertRecord(rel, record);
+  int n_inserts = 6600;
+  for (i = 0; i < n_inserts; i++) {
     testInsertRecord(rel, record);
+    printf("------ insert number (%d)\n", i);
   }
 
 
@@ -320,14 +328,17 @@ int main() {
   id.page = 0;
   id.slot = 0;
   testGetRecord(rel, id);
+  id.page = 99;
+  id.slot = 65;
+  testGetRecord(rel, id);
 
 
 
 
 
-  printf("\n*********************Testing shutDownRecordManager**********************\n");
-  shutdownRecordManager();
-  exit(0);
+  // printf("\n*********************Testing shutDownRecordManager**********************\n");
+  // shutdownRecordManager();
+  // exit(0);
 
 
 
