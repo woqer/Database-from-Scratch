@@ -1,7 +1,9 @@
 #include "buffer_mgr.h"
 #include "storage_mgr.h"
 #include <stdlib.h>
-// #include <string.h>
+#include <string.h>
+
+#include <signal.h>
 
 static int NumReadIO = 0;
 static int NumWriteIO = 0;
@@ -177,7 +179,7 @@ void free_pool(BM_BufferPool *bm) {
   printf("Freeing %i pages...\n", bm->numPages);
   int i;
   for (i = 0; i < bm->numPages; i++) {
-    printf("free(pi->frames[%d]), Page (%d)\n", i, pi->map[i]);
+    // printf("free(pi->frames[%d]), Page (%d)\n", i, pi->map[i]);
     // printf("pi->frames[%i] info: %s\n", i,pi->frames[i]);
     free(pi->frames[i]);
   }
@@ -214,6 +216,12 @@ RC shutdownBufferPool(BM_BufferPool *const bm) {
   rc_code = forceFlushPool(bm);
 
   int i;
+
+  // for (i = 0; i < bm->numPages; i++) {
+  //   printf("PAGES in LRU buffer (%d)\n", pi->map[i]);
+  // }
+
+
   for (i = 0; i < bm->numPages; i++) {
     if (pi->fixCounter[i] != 0) {
       printf("buffer_mrg: PINNED PAGE (%d) with fixCounter (%d)\n", pi->map[i], pi->fixCounter[i]);
@@ -288,18 +296,18 @@ RC readPageFIFO(BM_PoolInfo *const pi, BM_PageHandle *const page,
     pi->dirtys[index] = false;
   }
 
-  printf("buffer_mgr.readPageFIFO: before any returning code\n");
+  // printf("buffer_mgr.readPageFIFO: before any returning code\n");
 
   if (pageNum >= fh->totalNumPages) {
-    printf("buffer_mgr.readPageFIFO: appending... pageNum (%d) fh->totalNumPages (%d)\n", pageNum, fh->totalNumPages);
+    // printf("buffer_mgr.readPageFIFO: appending... pageNum (%d) fh->totalNumPages (%d)\n", pageNum, fh->totalNumPages);
     rc_code = appendEmptyBlock(fh);
     // NumWriteIO++;
-    printf("buffer_mgr.readPageFIFO: appended returned (%d)\n", rc_code);
+    // printf("buffer_mgr.readPageFIFO: appended returned (%d)\n", rc_code);
 
     if (rc_code != RC_OK) return rc_code;
   }
 
-  printf("READING FROM DISK PAGE %i\n", pageNum);
+  // printf("READING FROM DISK PAGE %i\n", pageNum);
   rc_code = readBlock(pageNum, fh, memPage);
   NumReadIO++;
 
@@ -366,6 +374,7 @@ RC readPageLRU(BM_PoolInfo *const pi, BM_PageHandle *const page,
   }
 
   if (pageNum >= fh->totalNumPages) {
+    // printf("Append for (%d) when total is (%d)\n", pageNum, fh->totalNumPages);
     rc_code = appendEmptyBlock(fh);
     // NumWriteIO++;
     if (rc_code != RC_OK) return rc_code;
@@ -451,6 +460,11 @@ RC pinPage (BM_BufferPool *const bm, BM_PageHandle *const page,
   BM_PoolInfo *pi = (BM_PoolInfo *)bm->mgmtData;
 
   int index = searchArray(pageNum, pi->map, bm->numPages);
+
+  if (pageNum > 1000) {
+    printf("Pinning P A G E  (%d)  ! ! !\n", pageNum);
+    raise(SIGINT);
+  }
 
   if (index < 0) {
     if (searchArray(0, pi->fixCounter, pi->numPages) < 0) {

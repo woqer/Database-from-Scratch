@@ -147,14 +147,23 @@ RID add_record_to_header(Table_Header *th, DB_header *db_header) {
 
     BM_PageHandle *page_handler_empty = MAKE_PAGE_HANDLE();
     page_handler_empty->data = "";
-    CHECK(pinPage(buffer_manager, page_handler_empty, th->pagesList[th->numPages - 1]));
+    // printf("Adding new page (%d) to table\n", th->pagesList[th->numPages - 1]);
+
+    // printf("------******###### Pinning Page (%d) (add_record_to_header) ######******------\n", th->pagesList[th->numPages - 1]);
+    RC rc = pinPage(buffer_manager, page_handler_empty, th->pagesList[th->numPages - 1]);
+
+    if (rc != RC_OK) {
+      shutdownRecordManager();
+      exit(rc);
+    }
+
     memset(page_handler_empty->data, 0, sizeof( *(page_handler_empty->data) ) * PAGE_SIZE);
     CHECK(markDirty(buffer_manager, page_handler_empty));
     CHECK(unpinPage(buffer_manager, page_handler_empty));
     
     // printf("New page (%d)\n", th->pagesList[th->numPages-1]);
     int new_length = th->slots_per_page * th->numPages;
-    printf("Reallocing th->active to length %d\n", new_length);
+    // printf("Reallocing th->active to length %d\n", new_length);
     void* returned = NULL;
     returned = realloc(th->active, sizeof(bool) * new_length);
     
@@ -260,9 +269,11 @@ void printTable_Header(Table_Header *th) {
     printf("headerPagesList[%i]\t%d\n", i, th->headerPagesList[i]);
   }
   
-  printf("active: [");
-  for (i = 0; i < active_size; i++) {
-    printf(" %d-%s ,", i,th->active[i] ? "true" : "false");
+  printf("active(falses): [");
+  for (i = 0; i < 2064; i++) {
+    if (!th->active[i]) {
+      printf(" %d-%s ,", i, th->active[i] ? "true" : "false");
+    }
   }
   printf("]\n");
 
@@ -401,7 +412,9 @@ char *write_table_serializer(Table_Header *th, DB_header *db_header) {
 
       BM_PageHandle *page_handler = MAKE_PAGE_HANDLE();
       page_handler->data = "";
-      pinPage(buffer_manager, page_handler, th->headerPagesList[i]);
+      // printf("Requesting a pinpage to (%d)\n", th->headerPagesList[j]);
+    // printf("------******###### Pinning Page (%d) (w_table_serializer for loop) ######******------\n", th->headerPagesList[j]);
+      pinPage(buffer_manager, page_handler, th->headerPagesList[j]);
     
       memcpy(page_handler->data, th->active + active_offset, write_size);
       active_offset += (write_size / bool_size);
@@ -416,11 +429,12 @@ char *write_table_serializer(Table_Header *th, DB_header *db_header) {
       page_handler->data = "";
       write_size = remaining_size > PAGE_SIZE ? PAGE_SIZE : remaining_size;
       
-      printDB_Header(db_header);
-      printTable_Header(th);
-      printf("W_table_header_serializer... creating new page\n");
+      // printDB_Header(db_header);
+      // printTable_Header(th);
+      // printf("W_table_header_serializer... creating new page (%d)\n", db_header->nextAvailPage);
 
       th->headerPagesList[th->headerNumPages++] = db_header->nextAvailPage;
+    // printf("------******###### Pinning Page (%d) (w_table_serializer while loop) ######******------\n", db_header->nextAvailPage);
       CHECK(pinPage(buffer_manager, page_handler, db_header->nextAvailPage++));
 
       memcpy(page_handler->data, th->active + active_offset, write_size);
@@ -440,7 +454,7 @@ char *write_table_serializer(Table_Header *th, DB_header *db_header) {
   free(sch_data); //already copied
 
   if (changed) {
-    printf("W_table_header_serializer... page created, updating table header...\n");
+    // printf("W_table_header_serializer... page created, updating table header...\n");
     
     free(out);
     out = write_table_serializer(th, db_header);
@@ -458,7 +472,7 @@ char *write_table_serializer(Table_Header *th, DB_header *db_header) {
     // Table_Header *th_read = read_table_serializer(out, db_header);
     // printf("W_table_header_serializer... page created, updating table header... P R I N T I N G\n");
     // printTable_Header(th_read);
-    printf("W_table_header_serializer... page created, updating table header... D O N E \n");
+    // printf("W_table_header_serializer... page created, updating table header... D O N E \n");
   }
 
 
@@ -623,7 +637,8 @@ Table_Header *read_table_serializer(char *data, DB_header *db_header) {
 
       BM_PageHandle *page_handler = MAKE_PAGE_HANDLE();
       page_handler->data = "";
-      pinPage(buffer_manager, page_handler, th->headerPagesList[i]);
+    // printf("------******###### Pinning Page (%d) (r_table_serializer for loop) ######******------\n", db_header->nextAvailPage);
+      pinPage(buffer_manager, page_handler, th->headerPagesList[j]);
     
       memcpy(th->active + active_offset, page_handler->data, write_size);
       active_offset += (write_size / bool_size);
@@ -676,7 +691,7 @@ RC initRecordManager (void *mgmtData) {
   
   // CHANGE THIS after testing!!!!
   // to 100 pages (4M in memory, not too much) and RS_LRU !
-  initBufferPool(buffer_manager, pageFileName, 100, RS_LRU, NULL);
+  initBufferPool(buffer_manager, pageFileName, 200, RS_LRU, NULL);
 
 
   CHECK(pinPage(buffer_manager, page_handler_db, 0));
@@ -712,20 +727,20 @@ RC initRecordManager (void *mgmtData) {
   return RC_OK;
 }
 
-void testSerializers() {
-  CHECK(pinPage(buffer_manager, page_handler_db, 0)); //page handler for database header
-  DB_header *db_header = read_db_serializer(page_handler_db->data); //DB_hearder structure for the data in database header
+// void testSerializers() {
+//   CHECK(pinPage(buffer_manager, page_handler_db, 0)); //page handler for database header
+//   DB_header *db_header = read_db_serializer(page_handler_db->data); //DB_hearder structure for the data in database header
   
-  char *data = write_db_serializer(db_header);
-  memcpy(page_handler_db->data, data, getDB_HeaderSize());
+//   char *data = write_db_serializer(db_header);
+//   memcpy(page_handler_db->data, data, getDB_HeaderSize());
   
-  markDirty(buffer_manager, page_handler_db);
-  unpinPage(buffer_manager, page_handler_db);
+//   markDirty(buffer_manager, page_handler_db);
+//   unpinPage(buffer_manager, page_handler_db);
   
-  free_db_header(db_header);
-  free(data);
+//   free_db_header(db_header);
+//   free(data);
 
-}
+// }
 
 RC shutdownRecordManager () {
   // CHECK(pinPage(buffer_manager, page_handler_db, 0));
@@ -951,6 +966,7 @@ RC insertRecord (RM_TableData *rel, Record *record) {
   record->id.page = th_header->numPages - 1;
   record->id.slot = th_header->nextSlot;
 
+    // printf("------******###### Pinning Page (%d) (insertRecord new page) ######******------\n", th_header->pagesList[th_header->numPages-1]);
   CHECK(pinPage(buffer_manager, page_handler_writing_page, th_header->pagesList[th_header->numPages-1]));
 
   int recordSize = getRecordSize(th_header->schema);

@@ -368,10 +368,10 @@ appendEmptyBlock (SM_FileHandle *fHandle)
 	fseek(fp, 0L, SEEK_CUR);
 	// fwrite(&zero, sizeof(char), PAGE_SIZE, fp);
 
-  printf("Appending page...\n");
+  // printf("Appending page (%d)...\n", totalNumPages);
   memset(buff, 0, sizeof(*buff) * PAGE_SIZE);
   fwrite(buff, sizeof(*buff) * PAGE_SIZE, 1, fp);
-  printf("End of appending page...\n");
+  // printf("End of appending page...\n");
 
 
 
