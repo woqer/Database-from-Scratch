@@ -47,6 +47,9 @@ expr:
 	gcc $(OPT) \
 	dberror.c \
 	expr.c \
+	storage_mgr.c \
+	buffer_mgr.c \
+	buffer_mgr_stat.c \
 	record_mgr.c \
 	test_expr.c -o test_expr	
 
