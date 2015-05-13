@@ -6,7 +6,7 @@
   * assign3: record manager
 
 ### Group Members:
-* Wiflrido Vidana
+* [Wiflrido Vidana](mailto:wvidanas@gmail.com)
 * An Shi
 * Zhinqun Nie
 * Matthew Jankowiak
